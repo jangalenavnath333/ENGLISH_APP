@@ -1,0 +1,34 @@
+const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export async function sendChatMessage(messages: ChatMessage[]) {
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-exp:free", // using a free/fast model for testing, or any supported model
+        messages: [
+          {
+            role: "system",
+            content: "You are Bolu, a friendly and encouraging English teacher for Marathi speaking students. Your goal is to help the user practice spoken English in everyday scenarios (e.g., at a cafe, in an interview). Keep your responses short (1-2 sentences). Correct their mistakes politely, and explain in simple Marathi if needed. Then ask a follow-up question to keep the conversation going."
+          },
+          ...messages
+        ]
+      })
+    });
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("OpenRouter API Error:", error);
+    return "माफ करा, मला समजले नाही. आपण पुन्हा प्रयत्न करूया का?"; // Fallback response
+  }
+}

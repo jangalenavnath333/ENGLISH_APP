@@ -1,8 +1,11 @@
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image } from "react-native";
 import { Link, router } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAuth } from "../lib/useAuth";
 
 export default function LoginScreen() {
+  const { loginAsGuest, loading } = useAuth();
+
   const handleLogin = () => {
     router.replace("/(tabs)/home");
   };
@@ -97,9 +100,11 @@ export default function LoginScreen() {
               <Text style={styles.secondaryButtonText}>Phone Login</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleLogin}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={loginAsGuest} disabled={loading}>
               <Ionicons name="person-outline" size={20} color="#6B7280" />
-              <Text style={styles.secondaryButtonTextDark}>Guest Entry</Text>
+              <Text style={styles.secondaryButtonTextDark}>
+                {loading ? "Loading..." : "Guest Entry"}
+              </Text>
             </TouchableOpacity>
           </View>
 

@@ -1,8 +1,16 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAuth } from "../../lib/useAuth";
 
 export default function HomeScreen() {
+  const { profile } = useAuth();
+  
+  const xp = profile?.xp || 0;
+  const streak = profile?.streak || 0;
+  const name = profile?.name || "Learner";
+  const level = profile?.level || "Elementary Level 1";
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
@@ -20,7 +28,7 @@ export default function HomeScreen() {
         <View style={styles.headerRight}>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={16} color="#D97706" />
-            <Text style={styles.streakText}>5</Text>
+            <Text style={styles.streakText}>{streak}</Text>
           </View>
           <View style={styles.profileIcon}>
             <Ionicons name="person" size={16} color="#fff" />
@@ -31,7 +39,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Welcome Text */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.greeting}>Good morning, Navnath! 👋</Text>
+          <Text style={styles.greeting}>Good morning, {name.split(" ")[0]}! 👋</Text>
           <Text style={styles.subGreeting}>
             आजची प्रॅक्टिस पूर्ण करूया! <Text style={styles.subGreetingEn}>(Let's complete today's ...)</Text>
           </Text>
@@ -42,14 +50,14 @@ export default function HomeScreen() {
           <View style={[styles.statBox, { backgroundColor: '#FEF3C7' }]}>
             <View style={styles.statIconRow}>
               <Ionicons name="flame" size={16} color="#D97706" />
-              <Text style={styles.statValue}>5 Days</Text>
+              <Text style={styles.statValue}>{streak} Days</Text>
             </View>
             <Text style={styles.statLabel}>Streak</Text>
           </View>
           <View style={[styles.statBox, { backgroundColor: '#E0F2FE' }]}>
             <View style={styles.statIconRow}>
               <MaterialCommunityIcons name="diamond" size={16} color="#0284C7" />
-              <Text style={styles.statValue}>230 XP</Text>
+              <Text style={styles.statValue}>{xp} XP</Text>
             </View>
             <Text style={styles.statLabel}>Earned</Text>
           </View>
@@ -58,7 +66,7 @@ export default function HomeScreen() {
               <Ionicons name="school" size={16} color="#145E4C" />
               <Text style={styles.statValue}>Elem.</Text>
             </View>
-            <Text style={styles.statLabel}>Level A1</Text>
+            <Text style={styles.statLabel}>{level}</Text>
           </View>
         </View>
 
