@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../lib/useAuth";
@@ -14,17 +14,24 @@ export default function HomeScreen() {
   const level = profile?.level || "Elementary Level 1";
 
   const handleLogout = async () => {
-    Alert.alert("Logout", "तुम्हाला नक्की Logout करायचं आहे का?", [
-      { text: "Cancel", style: "cancel" },
-      { 
-        text: "Yes, Logout", 
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/");
-        }
+    if (Platform.OS === 'web') {
+      if (window.confirm("तुम्हाला नक्की Logout करायचं आहे का? (Are you sure?)")) {
+        await logout();
+        router.replace("/");
       }
-    ]);
+    } else {
+      Alert.alert("Logout", "तुम्हाला नक्की Logout करायचं आहे का?", [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Yes, Logout", 
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/");
+          }
+        }
+      ]);
+    }
   };
 
   const playRecap = () => {
@@ -101,22 +108,22 @@ export default function HomeScreen() {
             <Text style={styles.goalTagText}>TODAY'S GOAL · 10 MIN</Text>
           </View>
           <Text style={styles.goalTitle}>Start Today's Practice</Text>
-          <Text style={styles.goalLesson}>Lesson 6 · Canteen Conversation ☕</Text>
+          <Text style={styles.goalLesson}>Lesson {profile?.currentLesson || 1} · Step-by-step English 🚀</Text>
           
           <Text style={styles.goalDescMarathi}>
-            कॅन्टीनमध्ये मित्रांसोबत इंग्रजीत ऑर्डर द्यायला शिका.
+            तुमच्या सध्याच्या पातळीनुसार आजचा नवीन धडा शिका आणि प्रॅक्टिस करा.
           </Text>
           <Text style={styles.goalDescEnglish}>
-            (Learn to order food with friends in English)
+            (Learn and practice today's new lesson based on your current level)
           </Text>
 
           <View style={styles.goalFooter}>
-            <TouchableOpacity style={styles.startBtn} onPress={() => router.navigate("/(tabs)/practice")}>
-              <Text style={styles.startBtnText}>Start Practice</Text>
+            <TouchableOpacity style={styles.startBtn} onPress={() => router.navigate(`/(tabs)/practice?lesson=${profile?.currentLesson || 1}`)}>
+              <Text style={styles.startBtnText}>Start Lesson {profile?.currentLesson || 1}</Text>
               <Ionicons name="arrow-forward" size={18} color="#145E4C" />
             </TouchableOpacity>
             <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>Step 1 of 3</Text>
+              <Text style={styles.progressText}>Step 1</Text>
               <View style={styles.progressBarBg}>
                 <View style={styles.progressBarFill} />
               </View>
@@ -201,7 +208,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.browseAllBtn} onPress={() => router.navigate("/(tabs)/practice")}>
+        <TouchableOpacity style={styles.browseAllBtn} onPress={() => router.navigate("/(tabs)/progress")}>
           <Text style={styles.browseAllText}>🗺️ Browse All Lessons</Text>
           <Ionicons name="chevron-forward" size={16} color="#145E4C" />
         </TouchableOpacity>

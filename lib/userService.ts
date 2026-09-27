@@ -39,6 +39,11 @@ export async function createUserProfile(uid: string, data: Partial<UserProfile>)
       createdAt: serverTimestamp(),
       ...data,
     });
+  } else {
+    // Update name if it's explicitly provided and valid
+    if (data.name && data.name !== "Learner" && data.name !== "Guest User") {
+      await updateDoc(userRef, { name: data.name });
+    }
   }
 }
 
