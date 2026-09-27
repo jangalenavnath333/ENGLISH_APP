@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } fr
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../lib/useAuth";
 import { updateUserProgress } from "../../lib/userService";
 import * as Speech from "expo-speech";
@@ -54,6 +54,8 @@ const QUESTIONS = [
 
 export default function AssessScreen() {
   const { user, profile } = useAuth();
+  const { lesson } = useLocalSearchParams();
+  const lessonNumber = parseInt(lesson as string) || 1;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -89,13 +91,14 @@ export default function AssessScreen() {
         setStatus('finished');
         setLoading(true);
         if (user) {
-          await updateUserProgress(user.uid, 50, streak);
+          // Grant XP for completing the quiz, but full lesson completion is after Practice
+          await updateUserProgress(user.uid, 50, lessonNumber - 1); // Not fully completing lesson yet
         }
         setLoading(false);
         Alert.alert(
           "अभिनंदन! 🏆",
-          "तुम्ही सर्व प्रश्नांची बरोबर उत्तरे दिली. तुम्हाला 50 XP मिळाले!",
-          [{ text: "Home वर जा", onPress: () => router.replace('/(tabs)/home') }]
+          "तुम्ही सर्व प्रश्नांची बरोबर उत्तरे दिली. आता आपण प्रॅक्टिस (Roleplay) कडे वळूया!",
+          [{ text: "Start Speaking Practice", onPress: () => router.replace(`/(tabs)/practice?lesson=${lessonNumber}`) }]
         );
       }
     } else if (status === 'wrong') {

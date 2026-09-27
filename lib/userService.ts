@@ -86,15 +86,34 @@ export async function updateUserProgress(
 
   // Update completed lessons
   const completedLessons = data.completedLessons || [];
-  if (!completedLessons.includes(lessonCompleted)) {
+  if (lessonCompleted > 0 && !completedLessons.includes(lessonCompleted)) {
     completedLessons.push(lessonCompleted);
   }
 
   await updateDoc(userRef, {
-    xp: data.xp + xpGained,
+    xp: (data.xp || 0) + xpGained,
     streak: newStreak,
     lastPracticeDate: today,
     completedLessons,
-    currentLesson: Math.max(data.currentLesson, lessonCompleted + 1),
+    currentLesson: Math.max(data.currentLesson || 1, lessonCompleted + 1),
   });
+}
+
+import { collection, addDoc } from "firebase/firestore";
+
+// Save a mistake to the mistake_book collection
+export async function saveMistake(uid: string, originalText: string, correctedText: string, explanation: string) {
+  try {
+    const mistakesRef = collection(db, "mistake_book");
+    await addDoc(mistakesRef, {
+      uid,
+      originalText,
+      correctedText,
+      explanation,
+      createdAt: serverTimestamp(),
+      revised: false
+    });
+  } catch (error) {
+    console.error("Error saving mistake:", error);
+  }
 }

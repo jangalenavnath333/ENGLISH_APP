@@ -118,7 +118,7 @@ export default function HomeScreen() {
           </Text>
 
           <View style={styles.goalFooter}>
-            <TouchableOpacity style={styles.startBtn} onPress={() => router.navigate(`/(tabs)/practice?lesson=${profile?.currentLesson || 1}`)}>
+            <TouchableOpacity style={styles.startBtn} onPress={() => router.navigate(`/(tabs)/learn?lesson=${profile?.currentLesson || 1}`)}>
               <Text style={styles.startBtnText}>Start Lesson {profile?.currentLesson || 1}</Text>
               <Ionicons name="arrow-forward" size={18} color="#145E4C" />
             </TouchableOpacity>

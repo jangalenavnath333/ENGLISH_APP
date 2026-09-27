@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, useRef, useEffect } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../lib/useAuth";
-import { updateUserProgress } from "../../lib/userService";
+import { updateUserProgress, saveMistake } from "../../lib/userService";
 import { sendChatMessage, ChatMessage } from "../../lib/openRouter";
 import * as Speech from "expo-speech";
 
@@ -58,6 +58,15 @@ export default function PracticeScreen() {
       // Auto-speak the AI's reply (stripping out Marathi in parentheses for better English accent)
       const englishPart = botReply.replace(/\(.*?\)/g, '').trim();
       Speech.speak(englishPart, { language: "en-US", rate: 0.9 });
+
+      // Detect if there was a correction and save it to the Mistake Book
+      const mistakeMatch = botReply.match(/Correction:\s*(.*?)\s*\((.*?)\)/i);
+      if (mistakeMatch && user) {
+        const correctedText = mistakeMatch[1].trim();
+        const explanation = mistakeMatch[2].trim();
+        // Fire and forget
+        saveMistake(user.uid, inputText, correctedText, explanation);
+      }
 
     } catch (e: any) {
       setMessages([...newMessages, { role: "assistant", content: `माफ करा, सर्व्हर एरर आला: ${e.message}` }]);
