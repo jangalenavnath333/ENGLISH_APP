@@ -10,8 +10,10 @@ export default function LoginScreen() {
   const [view, setView] = useState<'home' | 'login' | 'register'>('home');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleEmailLogin = async () => {
     if (!email || !password) {
@@ -20,29 +22,39 @@ export default function LoginScreen() {
     }
     setLocalLoading(true);
     try {
-      // Allow user to just type 'username' and we append a fake domain if missing @
       const formattedEmail = email.includes('@') ? email.trim() : `${email.trim()}@bolu.app`;
       await loginWithEmail(formattedEmail, password);
       router.replace("/(tabs)/home");
     } catch (e: any) {
-      Alert.alert("चुकले!", "Email किंवा Password चुकीचा आहे.");
+      Alert.alert("चुकले!", "Email किंवा Password चुकीचा आहे. किंवा तुम्ही Firebase मध्ये Email Auth ऑन केले नसेल.");
     } finally {
       setLocalLoading(false);
     }
   };
 
   const handleRegister = async () => {
-    if (!email || !password || !name) {
+    if (!email || !password || !name || !confirmPassword) {
       Alert.alert("थांबा!", "कृपया तुमचे नाव, Email आणि Password टाका.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("थांबा!", "दोन्ही पासवर्ड मॅच होत नाहीत. (Passwords do not match)");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert("थांबा!", "पासवर्ड किमान ६ अक्षरांचा असावा.");
       return;
     }
     setLocalLoading(true);
     try {
       const formattedEmail = email.includes('@') ? email.trim() : `${email.trim()}@bolu.app`;
       await registerWithEmail(formattedEmail, password, name);
-      router.replace("/(tabs)/home");
+      Alert.alert("अभिनंदन!", "तुमचं अकाउंट तयार झालं आहे! आता लॉगिन करा.");
+      setPassword('');
+      setConfirmPassword('');
+      setView('login');
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Registration failed. Try again.");
+      Alert.alert("एरर (Error)", "अकाउंट बनवता आले नाही. तुम्ही Firebase Console मध्ये 'Email/Password' चालू केले आहे का ते तपासा! \n\n(" + e.message + ")");
     } finally {
       setLocalLoading(false);
     }
@@ -151,14 +163,19 @@ export default function LoginScreen() {
               autoCapitalize="none"
               placeholderTextColor="#9CA3AF"
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholderTextColor="#9CA3AF"
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholderTextColor="#9CA3AF"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
             
             <TouchableOpacity style={styles.primaryBtn} onPress={handleEmailLogin} disabled={isLoading}>
               {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Login</Text>}
@@ -190,14 +207,32 @@ export default function LoginScreen() {
               autoCapitalize="none"
               placeholderTextColor="#9CA3AF"
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Password (min 6 characters)"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholderTextColor="#9CA3AF"
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password (min 6 characters)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholderTextColor="#9CA3AF"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showPassword}
+                placeholderTextColor="#9CA3AF"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
             
             <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={isLoading}>
               {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Register Account</Text>}
@@ -252,6 +287,9 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
   formSubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 10 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, fontSize: 16, color: '#111827' },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingRight: 16 },
+  passwordInput: { flex: 1, padding: 16, fontSize: 16, color: '#111827' },
+  eyeIcon: { padding: 4 },
   backBtn: { paddingVertical: 12, alignItems: 'center' },
   backBtnText: { color: '#6B7280', fontSize: 14, fontWeight: '600' }
 });

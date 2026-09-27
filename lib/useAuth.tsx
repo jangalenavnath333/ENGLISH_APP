@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { onAuthStateChanged, User, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, User, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { getUserProfile, createUserProfile, UserProfile } from './userService';
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   loginAsGuest: () => Promise<void>;
   loginWithEmail: (e: string, p: string) => Promise<void>;
   registerWithEmail: (e: string, p: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   loginAsGuest: async () => {},
   loginWithEmail: async () => {},
   registerWithEmail: async () => {},
+  logout: async () => {},
   refreshProfile: async () => {},
 });
 
@@ -82,6 +84,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       // Create user profile with their provided name
       await createUserProfile(cred.user.uid, { name });
+      // Immediately sign out so user is forced to log in manually
+      await signOut(auth);
     } catch (error) {
       console.error("Registration failed", error);
       setLoading(false);
@@ -89,8 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const logout = async () => {
+    await signOut(auth);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, loginAsGuest, loginWithEmail, registerWithEmail, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, loginAsGuest, loginWithEmail, registerWithEmail, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
