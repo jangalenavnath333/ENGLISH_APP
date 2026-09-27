@@ -5,6 +5,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { useAuth } from "../../lib/useAuth";
 import { updateUserProgress } from "../../lib/userService";
+import * as Speech from "expo-speech";
 
 export default function AssessScreen() {
   const { user, profile } = useAuth();
@@ -43,6 +44,10 @@ export default function AssessScreen() {
 
   const handleSkip = () => {
     router.replace('/(tabs)/home');
+  };
+
+  const playPronunciation = () => {
+    Speech.speak("Hello", { language: "en-US", rate: 0.7 });
   };
 
   return (
@@ -108,7 +113,7 @@ export default function AssessScreen() {
           <Text style={styles.wordText}>Hello</Text>
           <Text style={styles.pronunciation}>/həˈloʊ/ · हॅलो</Text>
           
-          <TouchableOpacity style={styles.listenBtn}>
+          <TouchableOpacity style={styles.listenBtn} onPress={playPronunciation}>
             <Ionicons name="volume-high-outline" size={16} color="#145E4C" />
             <Text style={styles.listenText}>Listen pronunciation</Text>
           </TouchableOpacity>

@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../lib/useAuth";
 import { router } from "expo-router";
+import * as Speech from "expo-speech";
 
 export default function HomeScreen() {
   const { profile, logout } = useAuth();
@@ -24,6 +25,14 @@ export default function HomeScreen() {
         }
       }
     ]);
+  };
+
+  const playRecap = () => {
+    Speech.speak("Here is a quick recap of your last session. You ordered food with your friends. You said: I would like a coffee.", { language: "en-US", rate: 0.9 });
+  };
+
+  const playWord = () => {
+    Speech.speak("Appetite. Desire to eat.", { language: "en-US", rate: 0.8 });
   };
 
   return (
@@ -150,7 +159,7 @@ export default function HomeScreen() {
             <Text style={styles.prevLesson}>📝 Lesson 5 · Friends & C...</Text>
           </View>
           <View style={styles.prevFooter}>
-            <TouchableOpacity style={styles.audioRow} onPress={() => Alert.alert("Coming Soon!", "This will replay your voice from the last session.")}>
+            <TouchableOpacity style={styles.audioRow} onPress={playRecap}>
               <Ionicons name="play-circle-outline" size={24} color="#3B82F6" />
               <Text style={styles.audioText}>Listen to recap (0:45)</Text>
             </TouchableOpacity>
@@ -171,7 +180,7 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.scWord}>Appetite</Text>
             <Text style={styles.scMeaning}>भूक (Desire to eat)</Text>
-            <TouchableOpacity style={styles.scAction} onPress={() => Alert.alert("Coming Soon", "Audio pronunciation will play.")}>
+            <TouchableOpacity style={styles.scAction} onPress={playWord}>
               <Text style={styles.scActionText}>Practice audio</Text>
               <Ionicons name="volume-high-outline" size={16} color="#145E4C" />
             </TouchableOpacity>
@@ -192,7 +201,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.browseAllBtn} onPress={() => Alert.alert("Coming Soon", "All lessons page will open here.")}>
+        <TouchableOpacity style={styles.browseAllBtn} onPress={() => router.navigate("/(tabs)/practice")}>
           <Text style={styles.browseAllText}>🗺️ Browse All Lessons</Text>
           <Ionicons name="chevron-forward" size={16} color="#145E4C" />
         </TouchableOpacity>

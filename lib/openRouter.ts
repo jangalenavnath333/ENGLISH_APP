@@ -14,7 +14,7 @@ export async function sendChatMessage(messages: ChatMessage[]) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp:free", // using a reliable free model on openrouter
+        model: "openrouter/free", // Best for free usage, always available
         messages: [
           {
             role: "system",
