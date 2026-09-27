@@ -262,6 +262,7 @@ export default function ProgressScreen() {
           <TimelineItem num={7} title="Daily Routine" subtitle="दैनंदिन दिनक्रम" locked />
           <TimelineItem num={8} title="Weekend Plans" subtitle="सुट्टीचे नियोजन व तयारी" locked />
         </View>
+        </View>
         )}
 
         {activeTab === 'Writing' && (
