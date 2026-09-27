@@ -58,6 +58,8 @@ export default function AssessScreen() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [status, setStatus] = useState<'idle' | 'correct' | 'wrong' | 'finished'>('idle');
+
   const streak = profile?.streak || 0;
   const currentQ = QUESTIONS[currentIndex];
 
@@ -68,24 +70,26 @@ export default function AssessScreen() {
     }
 
     if (selectedOption === currentQ.correctOption) {
-      // Correct Answer
+      setStatus('correct');
+      Speech.speak("Correct", { language: "en-US", rate: 1.2 });
+    } else {
+      setStatus('wrong');
+      Speech.speak("Incorrect", { language: "en-US", rate: 1.2 });
+    }
+  };
+
+  const handleContinue = async () => {
+    if (status === 'correct') {
       if (currentIndex < QUESTIONS.length - 1) {
-        Alert.alert(
-          "बरोबर उत्तर! 🎉",
-          "खूप छान! पुढच्या प्रश्नाकडे जाऊया.",
-          [{ 
-            text: "पुढे जा (Next)", 
-            onPress: () => {
-              setSelectedOption(null);
-              setCurrentIndex(currentIndex + 1);
-            }
-          }]
-        );
+        setSelectedOption(null);
+        setStatus('idle');
+        setCurrentIndex(currentIndex + 1);
       } else {
-        // Finished all questions
+        // Finished
+        setStatus('finished');
         setLoading(true);
         if (user) {
-          await updateUserProgress(user.uid, 50, streak); // 50 XP for completing the assessment
+          await updateUserProgress(user.uid, 50, streak);
         }
         setLoading(false);
         Alert.alert(
@@ -94,13 +98,10 @@ export default function AssessScreen() {
           [{ text: "Home वर जा", onPress: () => router.replace('/(tabs)/home') }]
         );
       }
-    } else {
-      // Wrong Answer
-      Alert.alert(
-        "चुकले! 😔",
-        `योग्य उत्तर '${currentQ.options.find(o => o.id === currentQ.correctOption)?.text}' आहे. पुन्हा प्रयत्न करा!`,
-        [{ text: "ओके" }]
-      );
+    } else if (status === 'wrong') {
+      // Just reset to try again or skip? Let's just let them try again.
+      setSelectedOption(null);
+      setStatus('idle');
     }
   };
 
@@ -200,7 +201,7 @@ export default function AssessScreen() {
                 <Text style={selectedOption === opt.id ? styles.optionSubTextSelected : styles.optionSubText}>{opt.sub}</Text>
               </View>
               {selectedOption === opt.id ? (
-                <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
+                <Ionicons name="checkmark-circle" size={24} color="#1CB0F6" />
               ) : (
                 <View style={styles.circleEmpty} />
               )}
@@ -228,19 +229,53 @@ export default function AssessScreen() {
           </View>
         </View>
 
-        {/* Submit Button */}
-        <TouchableOpacity 
-          style={[styles.submitBtn, { opacity: selectedOption ? 1 : 0.6 }]} 
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          <Text style={styles.submitBtnText}>
-            {loading ? "Checking..." : "Submit Answer (उत्तर सबमिट करा)"}
-          </Text>
-          {!loading && <Ionicons name="arrow-forward" size={20} color="#fff" />}
-        </TouchableOpacity>
+        {/* Submit Button or Banner */}
+        {status === 'idle' && (
+          <TouchableOpacity 
+            style={[styles.submitBtn, { opacity: selectedOption ? 1 : 0.6 }]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.submitBtnText}>
+              {loading ? "Checking..." : "Check"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
+
+      {/* Bottom Result Banner */}
+      {status !== 'idle' && status !== 'finished' && (
+        <View style={[styles.bottomBanner, status === 'correct' ? styles.bannerCorrect : styles.bannerWrong]}>
+          <View style={styles.bannerHeader}>
+            <View style={styles.bannerIconContainer}>
+              <Ionicons 
+                name={status === 'correct' ? "checkmark-circle" : "close-circle"} 
+                size={32} 
+                color={status === 'correct' ? "#15803D" : "#B91C1C"} 
+              />
+            </View>
+            <View>
+              <Text style={[styles.bannerTitle, status === 'correct' ? styles.bannerTitleCorrect : styles.bannerTitleWrong]}>
+                {status === 'correct' ? "Excellent!" : "Correct solution:"}
+              </Text>
+              {status === 'wrong' && (
+                <Text style={styles.bannerSubtitle}>
+                  {currentQ.options.find(o => o.id === currentQ.correctOption)?.text}
+                </Text>
+              )}
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={[styles.bannerBtn, status === 'correct' ? styles.bannerBtnCorrect : styles.bannerBtnWrong]}
+            onPress={handleContinue}
+          >
+            <Text style={[styles.bannerBtnText, status === 'correct' ? styles.bannerBtnTextCorrect : styles.bannerBtnTextWrong]}>
+              {status === 'correct' ? "Continue" : "Got it"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -280,16 +315,16 @@ const styles = StyleSheet.create({
   questionBoxText: { fontSize: 14, color: '#374151', fontWeight: '500' },
   optionsContainer: { gap: 12, marginBottom: 24 },
   optionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' },
-  optionSelected: { backgroundColor: '#E6F4EA', borderColor: '#145E4C' },
+  optionSelected: { backgroundColor: '#DDF4FF', borderColor: '#84D8FF' },
   optionLetterBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  optionLetterSelected: { backgroundColor: '#145E4C' },
+  optionLetterSelected: { backgroundColor: '#1CB0F6' },
   optionLetterText: { fontSize: 14, fontWeight: 'bold', color: '#4B5563' },
   optionLetterTextSelected: { fontSize: 14, fontWeight: 'bold', color: '#fff' },
   optionContent: { flex: 1 },
   optionText: { fontSize: 16, fontWeight: 'bold', color: '#111827', marginBottom: 2 },
-  optionTextSelected: { fontSize: 16, fontWeight: 'bold', color: '#145E4C', marginBottom: 2 },
+  optionTextSelected: { fontSize: 16, fontWeight: 'bold', color: '#1CB0F6', marginBottom: 2 },
   optionSubText: { fontSize: 13, color: '#6B7280' },
-  optionSubTextSelected: { fontSize: 13, color: '#145E4C' },
+  optionSubTextSelected: { fontSize: 13, color: '#1CB0F6' },
   circleEmpty: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#E2E8F0' },
   skipBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 12, marginBottom: 24, gap: 6 },
   skipText: { fontSize: 14, color: '#4B5563', fontWeight: '500' },
@@ -299,6 +334,21 @@ const styles = StyleSheet.create({
   tipContent: { flex: 1 },
   tipMarathi: { fontSize: 13, fontWeight: '600', color: '#111827', marginBottom: 4 },
   tipEnglish: { fontSize: 12, color: '#4B5563' },
-  submitBtn: { backgroundColor: '#145E4C', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 16, gap: 8 },
-  submitBtnText: { fontSize: 16, fontWeight: 'bold', color: '#fff' }
+  submitBtn: { backgroundColor: '#58CC02', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 16 },
+  submitBtnText: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
+  bottomBanner: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingTop: 24, borderTopWidth: 1 },
+  bannerCorrect: { backgroundColor: '#D7FFB8', borderColor: '#B5EA8E' },
+  bannerWrong: { backgroundColor: '#FFDFE0', borderColor: '#FFC4C5' },
+  bannerHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, gap: 12 },
+  bannerIconContainer: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  bannerTitle: { fontSize: 24, fontWeight: '800' },
+  bannerTitleCorrect: { color: '#58A700' },
+  bannerTitleWrong: { color: '#EA2B2B' },
+  bannerSubtitle: { fontSize: 16, color: '#EA2B2B', fontWeight: 'bold', marginTop: 4 },
+  bannerBtn: { paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+  bannerBtnCorrect: { backgroundColor: '#58CC02' },
+  bannerBtnWrong: { backgroundColor: '#FF4B4B' },
+  bannerBtnText: { fontSize: 16, fontWeight: 'bold' },
+  bannerBtnTextCorrect: { color: '#fff' },
+  bannerBtnTextWrong: { color: '#fff' }
 });
