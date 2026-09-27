@@ -31,10 +31,14 @@ export default function PracticeScreen() {
     setInputText("");
     setLoading(true);
 
-    const botReply = await sendChatMessage(newMessages);
-    
-    setMessages([...newMessages, { role: "assistant", content: botReply }]);
-    setLoading(false);
+    try {
+      const botReply = await sendChatMessage(newMessages);
+      setMessages([...newMessages, { role: "assistant", content: botReply }]);
+    } catch (e: any) {
+      setMessages([...newMessages, { role: "assistant", content: `माफ करा, सर्व्हर एरर आला: ${e.message}` }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const finishPractice = async () => {

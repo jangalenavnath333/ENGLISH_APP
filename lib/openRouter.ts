@@ -14,7 +14,7 @@ export async function sendChatMessage(messages: ChatMessage[]) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-exp:free", // using a free/fast model for testing, or any supported model
+        model: "google/gemini-2.0-flash-exp:free", // using a reliable free model on openrouter
         messages: [
           {
             role: "system",
@@ -26,9 +26,15 @@ export async function sendChatMessage(messages: ChatMessage[]) {
     });
 
     const data = await response.json();
+    
+    if (data.error) {
+      console.error("OpenRouter API Error Data:", data.error);
+      throw new Error(data.error.message || "Unknown API Error");
+    }
+
     return data.choices[0].message.content;
-  } catch (error) {
-    console.error("OpenRouter API Error:", error);
-    return "माफ करा, मला समजले नाही. आपण पुन्हा प्रयत्न करूया का?"; // Fallback response
+  } catch (error: any) {
+    console.error("OpenRouter API Error:", error.message);
+    throw new Error(error.message || "Failed to connect to AI.");
   }
 }
