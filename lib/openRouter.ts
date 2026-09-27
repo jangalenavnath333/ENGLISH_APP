@@ -38,3 +38,41 @@ export async function sendChatMessage(messages: ChatMessage[]) {
     throw new Error(error.message || "Failed to connect to AI.");
   }
 }
+
+export async function getNativeTranslation(marathiText: string) {
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openrouter/free", // Best for free usage, always available
+        messages: [
+          {
+            role: "system",
+            content: "You are Bolu, a translation AI. The user will provide a Marathi sentence. You must reply ONLY with a JSON object. Do not include markdown formatting or extra text. Format: {\"english\": \"[Native, natural sounding English translation]\", \"explanation\": \"[Brief explanation in Marathi why this is the natural way to say it in English, noting any idioms or slang]\"}"
+          },
+          {
+            role: "user",
+            content: marathiText
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || "Unknown API Error");
+    }
+
+    const contentString = data.choices[0].message.content;
+    const cleanContent = contentString.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleanContent);
+  } catch (error: any) {
+    console.error("Translation Error:", error.message);
+    throw new Error("Sorry, couldn't translate that right now.");
+  }
+}
