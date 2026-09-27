@@ -23,14 +23,17 @@ export default function PracticeScreen() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!inputText.trim()) return;
+  const sendMessage = async (overrideText?: string) => {
+    const textToSend = typeof overrideText === 'string' ? overrideText : inputText;
+    if (!textToSend.trim()) return;
 
-    const userMsg: ChatMessage = { role: "user", content: inputText };
+    const userMsg: ChatMessage = { role: "user", content: textToSend };
     const newMessages = [...messages, userMsg];
     
     setMessages(newMessages);
-    setInputText("");
+    if (typeof overrideText !== 'string') {
+      setInputText("");
+    }
     setLoading(true);
 
     try {
@@ -59,8 +62,8 @@ export default function PracticeScreen() {
         
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
-          setInputText(transcript);
           setIsListening(false);
+          sendMessage(transcript); // Automatically send immediately!
         };
         
         recognition.onerror = () => {
