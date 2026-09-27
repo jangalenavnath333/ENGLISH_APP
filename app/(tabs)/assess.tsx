@@ -7,12 +7,59 @@ import { useAuth } from "../../lib/useAuth";
 import { updateUserProgress } from "../../lib/userService";
 import * as Speech from "expo-speech";
 
+const QUESTIONS = [
+  {
+    id: 1,
+    word: "Hello",
+    pronunciation: "/həˈloʊ/ · हॅलो",
+    question: "What does this greeting mean in Marathi?",
+    category: "EVERYDAY GREETINGS",
+    options: [
+      { id: 'A', text: "🙏 नमस्कार", sub: "Namaskar (Greeting)" },
+      { id: 'B', text: "👋 निरोप", sub: "Nirop (Goodbye)" },
+      { id: 'C', text: "🙏 धन्यवाद", sub: "Dhanyavaad (Thank you)" },
+      { id: 'D', text: "❓ कृपया", sub: "Krupaya (Please)" },
+    ],
+    correctOption: 'A'
+  },
+  {
+    id: 2,
+    word: "Water",
+    pronunciation: "/ˈwɔːtər/ · वॉटर",
+    question: "What is the Marathi word for Water?",
+    category: "FOOD & DRINK",
+    options: [
+      { id: 'A', text: "☕ चहा", sub: "Chaha (Tea)" },
+      { id: 'B', text: "💧 पाणी", sub: "Paani (Water)" },
+      { id: 'C', text: "🥛 दूध", sub: "Dudh (Milk)" },
+      { id: 'D', text: "🍲 जेवण", sub: "Jevan (Food)" },
+    ],
+    correctOption: 'B'
+  },
+  {
+    id: 3,
+    word: "Thank You",
+    pronunciation: "/θæŋk juː/ · थँक यू",
+    question: "How do you say Thank You in Marathi?",
+    category: "POLITENESS",
+    options: [
+      { id: 'A', text: "🙏 नमस्कार", sub: "Namaskar (Hello)" },
+      { id: 'B', text: "😔 माफ करा", sub: "Maaf kara (Sorry)" },
+      { id: 'C', text: "🙏 धन्यवाद", sub: "Dhanyavaad (Thank you)" },
+      { id: 'D', text: "👍 ठीक आहे", sub: "Theek aahe (Okay)" },
+    ],
+    correctOption: 'C'
+  }
+];
+
 export default function AssessScreen() {
   const { user, profile } = useAuth();
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const streak = profile?.streak || 0;
+  const currentQ = QUESTIONS[currentIndex];
 
   const handleSubmit = async () => {
     if (!selectedOption) {
@@ -20,23 +67,38 @@ export default function AssessScreen() {
       return;
     }
 
-    if (selectedOption === 'A') {
+    if (selectedOption === currentQ.correctOption) {
       // Correct Answer
-      setLoading(true);
-      if (user) {
-        await updateUserProgress(user.uid, 15, streak); // 15 XP for correct answer
+      if (currentIndex < QUESTIONS.length - 1) {
+        Alert.alert(
+          "बरोबर उत्तर! 🎉",
+          "खूप छान! पुढच्या प्रश्नाकडे जाऊया.",
+          [{ 
+            text: "पुढे जा (Next)", 
+            onPress: () => {
+              setSelectedOption(null);
+              setCurrentIndex(currentIndex + 1);
+            }
+          }]
+        );
+      } else {
+        // Finished all questions
+        setLoading(true);
+        if (user) {
+          await updateUserProgress(user.uid, 50, streak); // 50 XP for completing the assessment
+        }
+        setLoading(false);
+        Alert.alert(
+          "अभिनंदन! 🏆",
+          "तुम्ही सर्व प्रश्नांची बरोबर उत्तरे दिली. तुम्हाला 50 XP मिळाले!",
+          [{ text: "Home वर जा", onPress: () => router.replace('/(tabs)/home') }]
+        );
       }
-      setLoading(false);
-      Alert.alert(
-        "बरोबर उत्तर! 🎉",
-        "तुम्हाला 15 XP मिळाले आहेत!",
-        [{ text: "पुढे जा (Next)", onPress: () => router.replace('/(tabs)/home') }]
-      );
     } else {
       // Wrong Answer
       Alert.alert(
         "चुकले! 😔",
-        "योग्य उत्तर 'A' (नमस्कार) आहे. पुन्हा प्रयत्न करा!",
+        `योग्य उत्तर '${currentQ.options.find(o => o.id === currentQ.correctOption)?.text}' आहे. पुन्हा प्रयत्न करा!`,
         [{ text: "ओके" }]
       );
     }
@@ -47,7 +109,7 @@ export default function AssessScreen() {
   };
 
   const playPronunciation = () => {
-    Speech.speak("Hello", { language: "en-US", rate: 0.7 });
+    Speech.speak(currentQ.word, { language: "en-US", rate: 0.7 });
   };
 
   return (
@@ -82,120 +144,68 @@ export default function AssessScreen() {
             <Ionicons name="close" size={20} color="#374151" />
           </TouchableOpacity>
           <View style={styles.progressBarContainer}>
-            <View style={styles.progressBarSegmentFill} />
-            <View style={styles.progressBarSegment} />
-            <View style={styles.progressBarSegment} />
+            {QUESTIONS.map((_, idx) => (
+              <View 
+                key={idx} 
+                style={idx <= currentIndex ? styles.progressBarSegmentFill : styles.progressBarSegment} 
+              />
+            ))}
           </View>
           <View style={styles.xpBadge}>
             <Ionicons name="flash" size={14} color="#D97706" />
-            <Text style={styles.xpBadgeText}>15 XP</Text>
+            <Text style={styles.xpBadgeText}>50 XP</Text>
           </View>
         </View>
 
         {/* Question Header */}
         <View style={styles.questionHeader}>
-          <Text style={styles.questionMeta}>LEVEL CHECK · Question 1/3</Text>
-          <Text style={styles.questionTitle}>Step 1: Vocabulary & Meaning</Text>
+          <Text style={styles.questionMeta}>LEVEL CHECK · Question {currentIndex + 1}/{QUESTIONS.length}</Text>
+          <Text style={styles.questionTitle}>Step {currentIndex + 1}: Vocabulary & Meaning</Text>
           <Text style={styles.questionSubtitle}>
-            Match the English word with its Marathi meaning
+            {currentQ.question}
           </Text>
           <Text style={styles.questionSubtitleMarathi}>
-            (खालील शब्दाचा योग्य मराठी अर्थ निवडा)
+            (खालील शब्दाचा योग्य अर्थ निवडा)
           </Text>
         </View>
 
         {/* Word Card */}
         <View style={styles.wordCard}>
           <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>EVERYDAY GREETINGS</Text>
+            <Text style={styles.categoryText}>{currentQ.category}</Text>
           </View>
           
-          <Text style={styles.wordText}>Hello</Text>
-          <Text style={styles.pronunciation}>/həˈloʊ/ · हॅलो</Text>
+          <Text style={styles.wordText}>{currentQ.word}</Text>
+          <Text style={styles.pronunciation}>{currentQ.pronunciation}</Text>
           
           <TouchableOpacity style={styles.listenBtn} onPress={playPronunciation}>
             <Ionicons name="volume-high-outline" size={16} color="#145E4C" />
             <Text style={styles.listenText}>Listen pronunciation</Text>
           </TouchableOpacity>
-          
-          <View style={styles.questionBox}>
-            <Text style={styles.questionBoxText}>What does this greeting mean in Marathi?</Text>
-          </View>
         </View>
 
         {/* Options */}
         <View style={styles.optionsContainer}>
-          <TouchableOpacity 
-            style={[styles.optionCard, selectedOption === 'A' && styles.optionSelected]}
-            onPress={() => setSelectedOption('A')}
-          >
-            <View style={[styles.optionLetterBox, selectedOption === 'A' && styles.optionLetterSelected]}>
-              <Text style={selectedOption === 'A' ? styles.optionLetterTextSelected : styles.optionLetterText}>A</Text>
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={selectedOption === 'A' ? styles.optionTextSelected : styles.optionText}>🙏 नमस्कार</Text>
-              <Text style={selectedOption === 'A' ? styles.optionSubTextSelected : styles.optionSubText}>Namaskar (Greeting)</Text>
-            </View>
-            {selectedOption === 'A' ? (
-              <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
-            ) : (
-              <View style={styles.circleEmpty} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.optionCard, selectedOption === 'B' && styles.optionSelected]}
-            onPress={() => setSelectedOption('B')}
-          >
-            <View style={[styles.optionLetterBox, selectedOption === 'B' && styles.optionLetterSelected]}>
-              <Text style={selectedOption === 'B' ? styles.optionLetterTextSelected : styles.optionLetterText}>B</Text>
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={selectedOption === 'B' ? styles.optionTextSelected : styles.optionText}>👋 निरोप</Text>
-              <Text style={selectedOption === 'B' ? styles.optionSubTextSelected : styles.optionSubText}>Nirop (Goodbye)</Text>
-            </View>
-            {selectedOption === 'B' ? (
-              <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
-            ) : (
-              <View style={styles.circleEmpty} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.optionCard, selectedOption === 'C' && styles.optionSelected]}
-            onPress={() => setSelectedOption('C')}
-          >
-            <View style={[styles.optionLetterBox, selectedOption === 'C' && styles.optionLetterSelected]}>
-              <Text style={selectedOption === 'C' ? styles.optionLetterTextSelected : styles.optionLetterText}>C</Text>
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={selectedOption === 'C' ? styles.optionTextSelected : styles.optionText}>🙏 धन्यवाद</Text>
-              <Text style={selectedOption === 'C' ? styles.optionSubTextSelected : styles.optionSubText}>Dhanyavaad (Thank you)</Text>
-            </View>
-            {selectedOption === 'C' ? (
-              <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
-            ) : (
-              <View style={styles.circleEmpty} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.optionCard, selectedOption === 'D' && styles.optionSelected]}
-            onPress={() => setSelectedOption('D')}
-          >
-            <View style={[styles.optionLetterBox, selectedOption === 'D' && styles.optionLetterSelected]}>
-              <Text style={selectedOption === 'D' ? styles.optionLetterTextSelected : styles.optionLetterText}>D</Text>
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={selectedOption === 'D' ? styles.optionTextSelected : styles.optionText}>❓ कृपया</Text>
-              <Text style={selectedOption === 'D' ? styles.optionSubTextSelected : styles.optionSubText}>Krupaya (Please)</Text>
-            </View>
-            {selectedOption === 'D' ? (
-              <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
-            ) : (
-              <View style={styles.circleEmpty} />
-            )}
-          </TouchableOpacity>
+          {currentQ.options.map((opt) => (
+            <TouchableOpacity 
+              key={opt.id}
+              style={[styles.optionCard, selectedOption === opt.id && styles.optionSelected]}
+              onPress={() => setSelectedOption(opt.id)}
+            >
+              <View style={[styles.optionLetterBox, selectedOption === opt.id && styles.optionLetterSelected]}>
+                <Text style={selectedOption === opt.id ? styles.optionLetterTextSelected : styles.optionLetterText}>{opt.id}</Text>
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={selectedOption === opt.id ? styles.optionTextSelected : styles.optionText}>{opt.text}</Text>
+                <Text style={selectedOption === opt.id ? styles.optionSubTextSelected : styles.optionSubText}>{opt.sub}</Text>
+              </View>
+              {selectedOption === opt.id ? (
+                <Ionicons name="checkmark-circle" size={24} color="#145E4C" />
+              ) : (
+                <View style={styles.circleEmpty} />
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Skip Button */}
