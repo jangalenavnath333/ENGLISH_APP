@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 export default function ProgressScreen() {
   return (
@@ -220,7 +221,10 @@ export default function ProgressScreen() {
           <TimelineItem num={5} title="Friends & College" subtitle="मित्र आणि कॉलेज गप्पा · 100%" done />
           
           {/* Active Item */}
-          <View style={[styles.timelineItem, styles.activeTimelineItem]}>
+          <TouchableOpacity 
+            style={[styles.timelineItem, styles.activeTimelineItem]}
+            onPress={() => router.push('/(tabs)/practice?lesson=6')}
+          >
             <View style={styles.activeNode}>
               <Text style={styles.activeNodeText}>6</Text>
             </View>
@@ -238,7 +242,7 @@ export default function ProgressScreen() {
                 </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
           
           <TimelineItem num={7} title="Daily Routine" subtitle="दैनंदिन दिनक्रम" locked />
           <TimelineItem num={8} title="Weekend Plans" subtitle="सुट्टीचे नियोजन व तयारी" locked />
@@ -251,7 +255,11 @@ export default function ProgressScreen() {
 
 function TimelineItem({ num, title, subtitle, done, locked }: any) {
   return (
-    <View style={styles.timelineItem}>
+    <TouchableOpacity 
+      style={styles.timelineItem} 
+      disabled={locked}
+      onPress={() => router.push(`/(tabs)/practice?lesson=${num}`)}
+    >
       <View style={[styles.node, done ? styles.nodeDone : styles.nodeLocked]}>
         {done && <Ionicons name="checkmark" size={16} color="#fff" />}
         {locked && <Ionicons name="lock-closed" size={14} color="#9CA3AF" />}
@@ -264,7 +272,7 @@ function TimelineItem({ num, title, subtitle, done, locked }: any) {
         {done && <Ionicons name="checkmark-circle-outline" size={20} color="#145E4C" style={styles.timelineCheck} />}
         {locked && <Ionicons name="lock-closed-outline" size={18} color="#D1D5DB" style={styles.timelineCheck} />}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

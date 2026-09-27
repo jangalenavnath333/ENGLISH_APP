@@ -2,16 +2,31 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, Tex
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useRef, useEffect } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../lib/useAuth";
 import { updateUserProgress } from "../../lib/userService";
 import { sendChatMessage, ChatMessage } from "../../lib/openRouter";
 import * as Speech from "expo-speech";
 
+const LESSON_CONTEXTS: any = {
+  "1": "Hello! Let's practice introducing yourself. What is your name and what do you do? (तुमचं नाव काय आणि तुम्ही काय करता?)",
+  "2": "Hi! Let's talk about everyday objects. What are three things you see in your room right now? (तुम्हाला आता खोलीत कोणत्या ३ वस्तू दिसत आहेत?)",
+  "3": "Hello! Let's practice asking for things. How would you ask for a glass of water? (तुम्ही पाण्याचा ग्लास कसा मागाल?)",
+  "4": "Hi! Let's talk about things you like. What is your favorite food and why? (तुमचा आवडता पदार्थ कोणता?)",
+  "5": "Hey! Imagine we are college friends. What classes do you have today? (तुझे आज कोणते क्लास आहेत?)",
+  "6": "Hello! I am Bolu, your AI English coach. Let's practice ordering food at a cafe today. What would you like to order? (तुम्हाला काय ऑर्डर करायला आवडेल?)",
+  "7": "Good morning! Tell me about your daily routine. What time do you wake up? (तू किती वाजता उठतोस?)",
+  "8": "Hi! The weekend is almost here. What are your plans for Saturday? (शनिवारचे तुझे काय प्लॅन्स आहेत?)"
+};
+
 export default function PracticeScreen() {
   const { user } = useAuth();
+  const { lesson } = useLocalSearchParams();
+  const lessonId = typeof lesson === 'string' ? lesson : "6";
+  const initialMsg = LESSON_CONTEXTS[lessonId] || LESSON_CONTEXTS["6"];
+
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Hello! I am Bolu, your AI English coach. Let's practice ordering food at a cafe today. What would you like to order? (तुम्हाला काय ऑर्डर करायला आवडेल?)" }
+    { role: "assistant", content: initialMsg }
   ]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
