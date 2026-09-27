@@ -1,15 +1,30 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../lib/useAuth";
+import { router } from "expo-router";
 
 export default function HomeScreen() {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   
   const xp = profile?.xp || 0;
   const streak = profile?.streak || 0;
   const name = profile?.name || "Learner";
   const level = profile?.level || "Elementary Level 1";
+
+  const handleLogout = async () => {
+    Alert.alert("Logout", "तुम्हाला नक्की Logout करायचं आहे का?", [
+      { text: "Cancel", style: "cancel" },
+      { 
+        text: "Yes, Logout", 
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          router.replace("/");
+        }
+      }
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -30,9 +45,9 @@ export default function HomeScreen() {
             <Ionicons name="flame" size={16} color="#D97706" />
             <Text style={styles.streakText}>{streak}</Text>
           </View>
-          <View style={styles.profileIcon}>
-            <Ionicons name="person" size={16} color="#fff" />
-          </View>
+          <TouchableOpacity style={styles.profileIcon} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -87,7 +102,7 @@ export default function HomeScreen() {
           </Text>
 
           <View style={styles.goalFooter}>
-            <TouchableOpacity style={styles.startBtn}>
+            <TouchableOpacity style={styles.startBtn} onPress={() => router.navigate("/(tabs)/practice")}>
               <Text style={styles.startBtnText}>Start Practice</Text>
               <Ionicons name="arrow-forward" size={18} color="#145E4C" />
             </TouchableOpacity>
@@ -135,10 +150,10 @@ export default function HomeScreen() {
             <Text style={styles.prevLesson}>📝 Lesson 5 · Friends & C...</Text>
           </View>
           <View style={styles.prevFooter}>
-            <View style={styles.audioRow}>
+            <TouchableOpacity style={styles.audioRow} onPress={() => Alert.alert("Coming Soon!", "This will replay your voice from the last session.")}>
               <Ionicons name="play-circle-outline" size={24} color="#3B82F6" />
               <Text style={styles.audioText}>Listen to recap (0:45)</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.completedRow}>
               <Ionicons name="checkmark-circle-outline" size={16} color="#145E4C" />
               <Text style={styles.completedText}>Completed</Text>
@@ -156,7 +171,7 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.scWord}>Appetite</Text>
             <Text style={styles.scMeaning}>भूक (Desire to eat)</Text>
-            <TouchableOpacity style={styles.scAction}>
+            <TouchableOpacity style={styles.scAction} onPress={() => Alert.alert("Coming Soon", "Audio pronunciation will play.")}>
               <Text style={styles.scActionText}>Practice audio</Text>
               <Ionicons name="volume-high-outline" size={16} color="#145E4C" />
             </TouchableOpacity>
@@ -170,14 +185,14 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.scWord}>Coffee or Tea?</Text>
             <Text style={styles.scMeaning}>2 वाक्यात उत्तर द्या</Text>
-            <TouchableOpacity style={styles.scActionOrange}>
+            <TouchableOpacity style={styles.scActionOrange} onPress={() => router.navigate("/(tabs)/assess")}>
               <Text style={styles.scActionTextOrange}>Start (60s)</Text>
               <Ionicons name="arrow-forward" size={16} color="#D97706" />
             </TouchableOpacity>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.browseAllBtn}>
+        <TouchableOpacity style={styles.browseAllBtn} onPress={() => Alert.alert("Coming Soon", "All lessons page will open here.")}>
           <Text style={styles.browseAllText}>🗺️ Browse All Lessons</Text>
           <Ionicons name="chevron-forward" size={16} color="#145E4C" />
         </TouchableOpacity>
