@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 export default function ProgressScreen() {
+  const [activeTab, setActiveTab] = useState<'Achievements' | 'Writing' | 'Speaking'>('Achievements');
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
@@ -43,16 +46,28 @@ export default function ProgressScreen() {
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
-          <TouchableOpacity style={[styles.tab, styles.activeTab]}>
-            <Text style={styles.activeTabText}>Achievements</Text>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'Achievements' && styles.activeTab]}
+            onPress={() => setActiveTab('Achievements')}
+          >
+            <Text style={activeTab === 'Achievements' ? styles.activeTabText : styles.tabText}>Achievements</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>Writing</Text>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'Writing' && styles.activeTab]}
+            onPress={() => setActiveTab('Writing')}
+          >
+            <Text style={activeTab === 'Writing' ? styles.activeTabText : styles.tabText}>Writing (Mistakes)</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>Speaking</Text>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'Speaking' && styles.activeTab]}
+            onPress={() => setActiveTab('Speaking')}
+          >
+            <Text style={activeTab === 'Speaking' ? styles.activeTabText : styles.tabText}>Speaking</Text>
           </TouchableOpacity>
         </View>
+
+        {activeTab === 'Achievements' && (
+          <View>
 
         {/* Level Card */}
         <View style={styles.levelCard}>
@@ -247,6 +262,23 @@ export default function ProgressScreen() {
           <TimelineItem num={7} title="Daily Routine" subtitle="दैनंदिन दिनक्रम" locked />
           <TimelineItem num={8} title="Weekend Plans" subtitle="सुट्टीचे नियोजन व तयारी" locked />
         </View>
+        )}
+
+        {activeTab === 'Writing' && (
+          <View style={{ flex: 1, paddingVertical: 40, alignItems: 'center' }}>
+            <Ionicons name="book" size={64} color="#D1D5DB" />
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#4B5563', marginTop: 16 }}>Your Mistake Book</Text>
+            <Text style={{ color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>This feature is coming soon.</Text>
+          </View>
+        )}
+
+        {activeTab === 'Speaking' && (
+          <View style={{ flex: 1, paddingVertical: 40, alignItems: 'center' }}>
+            <Ionicons name="mic" size={64} color="#D1D5DB" />
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#4B5563', marginTop: 16 }}>Speaking Analysis</Text>
+            <Text style={{ color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>This feature is coming soon.</Text>
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
