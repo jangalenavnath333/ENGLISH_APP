@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useRef, useEffect } from "react";
@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { useAuth } from "../../lib/useAuth";
 import { updateUserProgress } from "../../lib/userService";
 import { sendChatMessage, ChatMessage } from "../../lib/openRouter";
+import * as Speech from "expo-speech";
 
 export default function PracticeScreen() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function PracticeScreen() {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -34,10 +36,47 @@ export default function PracticeScreen() {
     try {
       const botReply = await sendChatMessage(newMessages);
       setMessages([...newMessages, { role: "assistant", content: botReply }]);
+      
+      // Auto-speak the AI's reply (stripping out Marathi in parentheses for better English accent)
+      const englishPart = botReply.replace(/\(.*?\)/g, '').trim();
+      Speech.speak(englishPart, { language: "en-US", rate: 0.9 });
+
     } catch (e: any) {
       setMessages([...newMessages, { role: "assistant", content: `माफ करा, सर्व्हर एरर आला: ${e.message}` }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startListening = () => {
+    if (Platform.OS === 'web') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setIsListening(true);
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInputText(transcript);
+          setIsListening(false);
+        };
+        
+        recognition.onerror = () => {
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognition.start();
+      } else {
+        Alert.alert("Not Supported", "तुमच्या ब्राउझरमध्ये Voice Typing सपोर्ट करत नाही.");
+      }
+    } else {
+      Alert.alert("Coming Soon", "मोबाईल ॲपमध्ये माईक लवकरच येत आहे!");
     }
   };
 
@@ -93,9 +132,12 @@ export default function PracticeScreen() {
         </ScrollView>
 
         <View style={styles.inputArea}>
+          <TouchableOpacity style={styles.micBtn} onPress={startListening}>
+            <Ionicons name="mic" size={22} color={isListening ? "#EF4444" : "#6B7280"} />
+          </TouchableOpacity>
           <TextInput
             style={styles.inputField}
-            placeholder="Type your response in English..."
+            placeholder={isListening ? "Listening..." : "Type your response in English..."}
             value={inputText}
             onChangeText={setInputText}
             onSubmitEditing={sendMessage}
@@ -200,6 +242,14 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
     alignItems: 'center',
     gap: 8,
+  },
+  micBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputField: {
     flex: 1,
