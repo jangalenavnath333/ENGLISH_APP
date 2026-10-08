@@ -50,6 +50,8 @@ export const TOPICS: Topic[] = [
   { id: "daily", emoji: "🌅", label: "रोजची दिनचर्या", prompt: "talking about your daily routine" },
   { id: "shop", emoji: "🛍️", label: "खरेदी", prompt: "shopping and bargaining at a market" },
   { id: "free", emoji: "💬", label: "मोकळ्या गप्पा", prompt: "free casual chat about anything the user likes" },
+  { id: "doctor", emoji: "🩺", label: "डॉक्टरकडे", prompt: "visiting a doctor and describing health problems" },
+  { id: "phone", emoji: "📞", label: "फोनवर बोलणं", prompt: "talking on the phone: calling, leaving messages, asking someone to repeat" },
 ];
 
 export interface TalkTurn {
@@ -230,6 +232,7 @@ export interface SentenceFeedback {
   score: number; // 1-10
   corrected: string; // best natural English version
   explanation: string; // Marathi
+  pronunciation: string; // Marathi tip on pronunciation ("" if typed)
 }
 
 // Student translates a Marathi sentence into English (typed or spoken); AI checks it.
@@ -244,7 +247,8 @@ export async function checkSentence(
     `Judge whether the English conveys the same meaning with correct grammar.\n` +
     `Return ONLY JSON with keys: transcript, isCorrect (boolean), score (integer 1-10), ` +
     `corrected (the best simple natural English sentence for the Marathi meaning), ` +
-    `explanation (short, simple, in MARATHI: what was wrong, or praise if correct).`;
+    `explanation (short, simple, in MARATHI: what was wrong, or praise if correct), ` +
+    `pronunciation (ONLY if audio was given: one short MARATHI tip on any mispronounced word, written with its Marathi-script pronunciation; otherwise empty string).`;
   const parts: any[] = input.audioBase64
     ? [{ inline_data: { mime_type: input.audioMimeType || "audio/wav", data: input.audioBase64 } }]
     : [{ text: input.text ?? "" }];
@@ -265,6 +269,7 @@ export async function checkSentence(
     score: Number(p.score) || 0,
     corrected: p.corrected ?? "",
     explanation: p.explanation ?? "",
+    pronunciation: p.pronunciation ?? "",
   };
 }
 

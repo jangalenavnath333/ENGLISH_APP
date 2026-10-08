@@ -89,6 +89,25 @@ export function useUsageTracker() {
   }, []);
 }
 
+const STREAK_MIN_SECONDS = 300; // a day counts for the streak after 5 minutes of study
+
+// Consecutive days (ending today, or yesterday if today is not studied yet) with >= 5 minutes
+export function computeStreak(usage: UsageData): number {
+  const studied = (d: Date) => {
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return (usage.days[`${d.getFullYear()}-${m}-${day}`] ?? 0) >= STREAK_MIN_SECONDS;
+  };
+  const d = new Date();
+  if (!studied(d)) d.setDate(d.getDate() - 1);
+  let streak = 0;
+  while (studied(d)) {
+    streak += 1;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
 export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

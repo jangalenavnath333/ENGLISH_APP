@@ -16,7 +16,8 @@ import {
   WordInfo,
 } from "../../lib/gemini";
 import { useVoiceRecorder } from "../../lib/useVoiceRecorder";
-import { bump, getUsage, recordQuiz, formatDuration, todayKey, UsageData } from "../../lib/usage";
+import { bump, getUsage, recordQuiz, formatDuration, todayKey, computeStreak, UsageData } from "../../lib/usage";
+import { addWeakWord, recordRevision, getDueWords, getWeakCount, WeakWord } from "../../lib/revision";
 
 const STORAGE_KEY = "bolu_plan_done_v1";
 
@@ -55,6 +56,7 @@ function VocabTask({ day }: { day: PlanDay }) {
             <Text style={styles.word}>
               {v.word}  <Text style={styles.meaning}>{v.meaning}</Text>
             </Text>
+            <Text style={styles.pron}>उच्चार: {v.pron}</Text>
             <Text style={styles.example}>{v.example}</Text>
           </View>
           <Ionicons name="volume-high" size={22} color="#145E4C" />
@@ -70,13 +72,20 @@ interface Question {
   hint: string;
   options: string[];
   answer: string;
+  weak?: { word: string; meaning: string; pron: string }; // saved for revision if answered wrong
 }
 
 function buildQuiz(day: PlanDay): Question[] {
   const words = shuffle(day.vocab).slice(0, 6);
   const wordQs: Question[] = words.map((w) => {
     const wrong = shuffle(day.vocab.filter((x) => x.word !== w.word)).slice(0, 3).map((x) => x.word);
-    return { prompt: w.meaning, hint: "इंग्रजीत काय म्हणतात?", options: shuffle([w.word, ...wrong]), answer: w.word };
+    return {
+      prompt: w.meaning,
+      hint: "इंग्रजीत काय म्हणतात?",
+      options: shuffle([w.word, ...wrong]),
+      answer: w.word,
+      weak: { word: w.word, meaning: w.meaning, pron: w.pron },
+    };
   });
   const verbs = shuffle(day.verbs).slice(0, 4);
   const verbQs: Question[] = verbs.map((v) => {
@@ -96,8 +105,10 @@ function QuizTask({ day }: { day: PlanDay }) {
   const pick = (opt: string) => {
     if (picked) return;
     setPicked(opt);
-    if (opt === questions[idx].answer) setCorrect((c) => c + 1);
-    say(questions[idx].answer);
+    const q = questions[idx];
+    if (opt === q.answer) setCorrect((c) => c + 1);
+    else if (q.weak) addWeakWord(q.weak.word, q.weak.meaning, q.weak.pron);
+    say(q.answer);
   };
 
   const next = () => {
@@ -276,6 +287,7 @@ function SentenceTask({ day }: { day: PlanDay }) {
             <Text style={styles.corrected}>{fb.corrected} 🔊</Text>
           </TouchableOpacity>
           <Text style={styles.example}>{fb.explanation}</Text>
+          {!!fb.pronunciation && <Text style={styles.tipText}>🗣️ उच्चार: {fb.pronunciation}</Text>}
           <TouchableOpacity style={[styles.checkBtn, { marginTop: 10 }]} onPress={next}>
             <Text style={styles.checkBtnText}>पुढचं वाक्य</Text>
           </TouchableOpacity>
@@ -414,6 +426,105 @@ function Dictionary() {
   );
 }
 
+// Spaced revision: words the learner got wrong come back until answered right 3 times
+function RevisionView({ onChange }: { onChange: () => void }) {
+  const [due, setDue] = useState<WeakWord[] | null>(null);
+  const [idx, setIdx] = useState(0);
+  const [round, setRound] = useState(0);
+
+  useEffect(() => {
+    getDueWords().then((w) => {
+      setDue(shuffle(w).slice(0, 10));
+      setIdx(0);
+    });
+  }, [round]);
+
+  const pool = useMemo(() => PLAN.flatMap((p) => p.vocab.map((x) => x.word)), []);
+
+  if (!due) return <ActivityIndicator style={{ marginTop: 40 }} color="#145E4C" />;
+
+  if (due.length === 0) {
+    return (
+      <View style={styles.quizEnd}>
+        <Text style={styles.celebrate}>🎉</Text>
+        <Text style={styles.score}>आज रिव्हिजनला काही नाही!</Text>
+        <Text style={styles.rule}>
+          क्विझ मध्ये चुकलेले शब्द इथे परत येतील आणि ३ वेळा बरोबर आले की शिकले असं मानलं जाईल. आधी Plan मधले टास्क करा.
+        </Text>
+      </View>
+    );
+  }
+
+  if (idx >= due.length) {
+    return (
+      <View style={styles.quizEnd}>
+        <Text style={styles.celebrate}>👏</Text>
+        <Text style={styles.score}>रिव्हिजन पूर्ण!</Text>
+        <TouchableOpacity
+          style={styles.checkBtn}
+          onPress={() => {
+            setRound((r) => r + 1);
+            onChange();
+          }}
+        >
+          <Text style={styles.checkBtnText}>पुन्हा तपासा</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Text style={styles.hintSmall}>रिव्हिजन {idx + 1}/{due.length}</Text>
+      <RevisionQuestion
+        key={`${round}-${idx}`}
+        w={due[idx]}
+        pool={pool}
+        onNext={() => {
+          setIdx(idx + 1);
+          onChange();
+        }}
+      />
+    </View>
+  );
+}
+
+function RevisionQuestion({ w, pool, onNext }: { w: WeakWord; pool: string[]; onNext: () => void }) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const [options] = useState(() => shuffle([w.word, ...shuffle(pool.filter((p) => p !== w.word)).slice(0, 3)]));
+
+  const pick = (opt: string) => {
+    if (picked) return;
+    setPicked(opt);
+    recordRevision(w.word, opt === w.word);
+    say(w.word);
+  };
+
+  return (
+    <View>
+      <Text style={styles.quizPrompt}>{w.meaning}</Text>
+      <Text style={styles.rule}>इंग्रजीत काय म्हणतात?</Text>
+      {options.map((o) => {
+        const bg = picked ? (o === w.word ? "#DCFCE7" : o === picked ? "#FEE2E2" : "#fff") : "#fff";
+        const border = picked ? (o === w.word ? "#22C55E" : o === picked ? "#EF4444" : "#E5E7EB") : "#E5E7EB";
+        return (
+          <TouchableOpacity key={o} style={[styles.option, { backgroundColor: bg, borderColor: border }]} onPress={() => pick(o)}>
+            <Text style={styles.optionText}>{o}</Text>
+          </TouchableOpacity>
+        );
+      })}
+      {picked && (
+        <>
+          <Text style={styles.pron}>उच्चार: {w.pron}</Text>
+          <TouchableOpacity style={styles.checkBtn} onPress={onNext}>
+            <Text style={styles.checkBtnText}>पुढे</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  );
+}
+
 function ReportView({ done }: { done: Record<string, boolean> }) {
   const [usage, setUsage] = useState<UsageData | null>(null);
 
@@ -487,21 +598,37 @@ function ReportView({ done }: { done: Record<string, boolean> }) {
       ))}
 
       <Text style={styles.tipText}>
-        💡 रोज किमान २ तास आणि सगळे ७ टास्क केले तर ४ दिवसांत तुम्ही सोपी वाक्यं बनवून बोलू आणि लिहू शकाल. वेळ आणि टास्क इथे आपोआप मोजले जातात.
+        💡 रोज सगळे ७ टास्क आणि उजळणी केली तर ७ दिवसांत तुम्ही सोपी वाक्यं बनवून बोलू आणि लिहू शकाल. वेळ आणि टास्क इथे आपोआप मोजले जातात.
       </Text>
     </View>
   );
 }
 
 export default function PlanScreen() {
-  const [mode, setMode] = useState<"plan" | "report">("plan");
+  const [mode, setMode] = useState<"plan" | "revision" | "report">("plan");
   const [dayIdx, setDayIdx] = useState(0);
   const [open, setOpen] = useState<TaskKey | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
+  const [weakCount, setWeakCount] = useState(0);
+  const [streak, setStreak] = useState(0);
+
+  const refreshSide = useCallback(() => {
+    getWeakCount().then(setWeakCount);
+    getUsage().then((u) => setStreak(computeStreak(u)));
+  }, []);
+
+  useFocusEffect(refreshSide);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .then((v) => v && setDone(JSON.parse(v)))
+      .then((v) => {
+        if (!v) return;
+        const saved: Record<string, boolean> = JSON.parse(v);
+        setDone(saved);
+        // open the first day that is not finished yet
+        const firstOpen = PLAN.findIndex((p) => TASKS.some((t) => !saved[`${p.day}-${t.key}`]));
+        setDayIdx(firstOpen === -1 ? PLAN.length - 1 : firstOpen);
+      })
       .catch(() => {});
   }, []);
 
@@ -532,15 +659,20 @@ export default function PlanScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>४ दिवसांचा इंग्रजी प्लॅन 🚀</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>{PLAN.length} दिवसांचा इंग्रजी प्लॅन 🚀</Text>
+          <Text style={styles.streakPill}>🔥 {streak}</Text>
+        </View>
         <Text style={styles.headerSub}>{totalDone}/{total} टास्क पूर्ण</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${(totalDone / total) * 100}%` }]} />
         </View>
         <View style={styles.segment}>
-          {(["plan", "report"] as const).map((m) => (
+          {(["plan", "revision", "report"] as const).map((m) => (
             <TouchableOpacity key={m} style={[styles.segBtn, mode === m && styles.segBtnActive]} onPress={() => setMode(m)}>
-              <Text style={[styles.segText, mode === m && { color: "#fff" }]}>{m === "plan" ? "📅 प्लॅन" : "📊 रिपोर्ट"}</Text>
+              <Text style={[styles.segText, mode === m && { color: "#fff" }]}>
+                {m === "plan" ? "📅 प्लॅन" : m === "revision" ? `🔁 उजळणी${weakCount ? ` (${weakCount})` : ""}` : "📊 रिपोर्ट"}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -550,29 +682,43 @@ export default function PlanScreen() {
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <ReportView done={done} />
         </ScrollView>
+      ) : mode === "revision" ? (
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <RevisionView onChange={refreshSide} />
+        </ScrollView>
       ) : (
         <>
-          <View style={styles.dayBar}>
-            {PLAN.map((p, i) => (
-              <TouchableOpacity
-                key={p.day}
-                style={[styles.dayChip, i === dayIdx && styles.dayChipActive]}
-                onPress={() => {
-                  setDayIdx(i);
-                  setOpen(null);
-                }}
-              >
-                <Text style={[styles.dayChipTop, i === dayIdx && { color: "#fff" }]}>Day {p.day}</Text>
-                <Text style={[styles.dayChipSub, i === dayIdx && { color: "#D1FAE5" }]}>
-                  {p.label} · {dayCount(p.day)}/{TASKS.length}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayBar}>
+              {PLAN.map((p, i) => (
+                <TouchableOpacity
+                  key={p.day}
+                  style={[styles.dayChip, i === dayIdx && styles.dayChipActive]}
+                  onPress={() => {
+                    setDayIdx(i);
+                    setOpen(null);
+                  }}
+                >
+                  <Text style={[styles.dayChipTop, i === dayIdx && { color: "#fff" }]}>
+                    {dayCount(p.day) === TASKS.length ? "✅ " : ""}Day {p.day}
+                  </Text>
+                  <Text style={[styles.dayChipSub, i === dayIdx && { color: "#D1FAE5" }]}>
+                    {p.label} · {dayCount(p.day)}/{TASKS.length}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
 
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {dayCount(day.day) === TASKS.length && (
+              <View style={styles.dayDone}>
+                <Text style={styles.celebrate}>🏆</Text>
+                <Text style={styles.dayDoneText}>Day {day.day} पूर्ण! शाब्बास! उद्याच्या दिवसाकडे चला.</Text>
+              </View>
+            )}
             <View style={styles.themeBox}>
-              <Text style={styles.themeTitle}>{day.theme}</Text>
+              <Text style={styles.themeTitle}>Day {day.day}: {day.theme}</Text>
               <Text style={styles.themeGoal}>{day.goal}</Text>
             </View>
 
@@ -621,8 +767,14 @@ const styles = StyleSheet.create({
   segBtn: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 10, backgroundColor: "#F3F4F6" },
   segBtnActive: { backgroundColor: "#145E4C" },
   segText: { fontWeight: "700", color: "#374151" },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  streakPill: { backgroundColor: "#FEF3C7", color: "#B45309", fontWeight: "800", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, overflow: "hidden" },
+  pron: { color: "#B45309", marginTop: 2, fontWeight: "600" },
+  celebrate: { fontSize: 48, textAlign: "center" },
+  dayDone: { backgroundColor: "#DCFCE7", borderRadius: 14, padding: 14, marginBottom: 12, alignItems: "center" },
+  dayDoneText: { color: "#166534", fontWeight: "700", textAlign: "center", marginTop: 4 },
   dayBar: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
-  dayChip: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 12, backgroundColor: "#F3F4F6" },
+  dayChip: { minWidth: 96, alignItems: "center", paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: "#F3F4F6" },
   dayChipActive: { backgroundColor: "#145E4C" },
   dayChipTop: { fontWeight: "700", color: "#111827" },
   dayChipSub: { fontSize: 11, color: "#6B7280", marginTop: 2 },
