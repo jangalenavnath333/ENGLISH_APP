@@ -44,6 +44,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="talk"
+        options={{
+          title: "Talk",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "mic" : "mic-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="assist"
         options={{
           title: "Assist",
