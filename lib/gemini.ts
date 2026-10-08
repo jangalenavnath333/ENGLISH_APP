@@ -1,10 +1,12 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+
 // Tried in order; next model is used if one is overloaded (503) or rate limited (429)
-const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"];
+const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
+const GEMINI_TTS_MODEL = "gemini-3.8-flash-tts";
 
 export interface TalkLanguage {
   name: string;
-  speech: string; // BCP-47 code for expo-speech
+  speech: string; // BCP-47 code for expo-speech fallback
 }
 
 export const AUTO_LANGUAGE = "Auto";
@@ -19,6 +21,35 @@ export const TALK_LANGUAGES: TalkLanguage[] = [
   { name: "Spanish", speech: "es-ES" },
   { name: "French", speech: "fr-FR" },
   { name: "German", speech: "de-DE" },
+];
+
+export interface Tutor {
+  id: "madam" | "sir";
+  label: string; // shown in UI
+  title: string; // used in prompt
+  emoji: string;
+  voice: string; // Gemini prebuilt voice name
+}
+
+export const TUTORS: Tutor[] = [
+  { id: "madam", label: "Madam", title: "a warm, patient female teacher (Madam)", emoji: "👩‍🏫", voice: "Kore" },
+  { id: "sir", label: "Sir", title: "a friendly, encouraging male teacher (Sir)", emoji: "👨‍🏫", voice: "Charon" },
+];
+
+export interface Topic {
+  id: string;
+  emoji: string;
+  label: string; // Marathi label for UI
+  prompt: string; // English description for the AI
+}
+
+export const TOPICS: Topic[] = [
+  { id: "intro", emoji: "👋", label: "ओळख करून द्या", prompt: "introducing yourself (name, job, city)" },
+  { id: "cafe", emoji: "☕", label: "कॅफेमध्ये ऑर्डर", prompt: "ordering food and drinks at a cafe" },
+  { id: "travel", emoji: "✈️", label: "प्रवास", prompt: "travel: asking for directions, tickets and hotels" },
+  { id: "daily", emoji: "🌅", label: "रोजची दिनचर्या", prompt: "talking about your daily routine" },
+  { id: "shop", emoji: "🛍️", label: "खरेदी", prompt: "shopping and bargaining at a market" },
+  { id: "free", emoji: "💬", label: "मोकळ्या गप्पा", prompt: "free casual chat about anything the user likes" },
 ];
 
 export interface TalkTurn {
@@ -40,31 +71,73 @@ export interface TalkInput {
   text?: string;
   audioBase64?: string;
   audioMimeType?: string;
+  start?: boolean; // tutor opens the conversation
+}
+
+export interface TalkOptions {
+  tutor: Tutor;
+  topic?: Topic;
+}
+
+// POST to Gemini, rotating through models on temporary overload / rate limit
+// A slow request (> timeoutMs) is aborted and the next model is tried.
+async function geminiRequest(models: string[], body: string, timeoutMs = 10000): Promise<any> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("EXPO_PUBLIC_GEMINI_API_KEY is missing in .env");
+  }
+  let data: any;
+  for (let attempt = 0; attempt < models.length * 2; attempt++) {
+    const model = models[attempt % models.length];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body,
+          signal: controller.signal,
+        }
+      );
+      data = await response.json();
+      const retryable = response.status === 503 || response.status === 429;
+      if (!data.error || !retryable) break;
+    } catch (e: any) {
+      if (e?.name !== "AbortError") throw e;
+      data = { error: { message: "Server slow, please try again" } };
+    } finally {
+      clearTimeout(timer);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  if (data.error) {
+    throw new Error(data.error.message || "Gemini API error");
+  }
+  return data;
 }
 
 export async function sendTalkTurn(
   language: string,
   history: TalkHistoryItem[],
-  input: TalkInput
+  input: TalkInput,
+  opts: TalkOptions
 ): Promise<TalkTurn> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("EXPO_PUBLIC_GEMINI_API_KEY is missing in .env");
-  }
-
   const isAuto = language === AUTO_LANGUAGE;
   const target = isAuto ? "the same language the user's latest message is in" : language;
 
   const system =
-    `You are Bolu, a friendly language conversation tutor for a Marathi speaker.\n` +
+    `You are Bolu, ${opts.tutor.title}, a conversation tutor for a Marathi speaker.\n` +
     (isAuto
-      ? `The user may speak or write in ANY language (English, Japanese, Hindi, Marathi, ...). Detect the language of their latest message and use it as the target language.\n`
+      ? `The user may speak or write in ANY language (English, Japanese, Hindi, Marathi, ...). Detect the language of their latest message and use it as the target language. If this is the very start of the chat, use English.\n`
       : `The user practices ${language} by speaking or writing.\n`) +
+    (opts.topic ? `Conversation topic: ${opts.topic.prompt}.\n` : "") +
     `If audio is given, first transcribe exactly what they said.\n` +
     `Rules:\n` +
     `1. Check the user's sentence for grammar, vocabulary or word-order mistakes.\n` +
     `2. If there is a mistake: set hasMistake=true, put the corrected sentence in "corrected" (in ${target}), and explain the mistake simply in MARATHI in "explanation".\n` +
     `3. If correct: hasMistake=false, corrected="" and explanation="".\n` +
-    `4. Then continue the conversation naturally in ${target} with a short reply (1-2 simple sentences) and a short follow-up question in "reply".\n` +
+    `4. Then continue the conversation naturally in ${target} with a short, spoken-style reply (1-2 simple sentences, no emojis, no markdown) and a short follow-up question in "reply".\n` +
     `5. "replyTranslation" is the Marathi meaning of "reply" (empty string if reply is already Marathi).\n` +
     `6. "languageCode" is the BCP-47 code (e.g. en-US, ja-JP, hi-IN, mr-IN) of the language used in "reply".\n` +
     `Reply ONLY as JSON with keys: transcript, hasMistake, corrected, explanation, reply, replyTranslation, languageCode.`;
@@ -76,44 +149,30 @@ export async function sendTalkTurn(
 
   const parts: any[] = [];
   if (historyText) parts.push({ text: `Conversation so far:\n${historyText}\n` });
-  if (input.audioBase64) {
+  if (input.start) {
+    parts.push({
+      text:
+        `Start the conversation now: greet the user warmly as their tutor and ask the first simple question` +
+        (opts.topic ? ` about: ${opts.topic.prompt}` : "") +
+        `. There is no user mistake yet (hasMistake=false, transcript="").`,
+    });
+  } else if (input.audioBase64) {
     parts.push({ text: "The user's new message is this audio:" });
     parts.push({
-      inline_data: { mime_type: input.audioMimeType || "audio/mp4", data: input.audioBase64 },
+      inline_data: { mime_type: input.audioMimeType || "audio/wav", data: input.audioBase64 },
     });
   } else {
     parts.push({ text: `The user's new message: ${input.text ?? ""}` });
   }
 
-  const body = JSON.stringify({
-    system_instruction: { parts: [{ text: system }] },
-    contents: [{ role: "user", parts }],
-    generationConfig: { responseMimeType: "application/json" },
-  });
-
-  // Retry a few times on temporary overload (503) / rate limit (429)
-  let data: any;
-  for (let attempt = 0; attempt < GEMINI_MODELS.length * 2; attempt++) {
-    const model = GEMINI_MODELS[attempt % GEMINI_MODELS.length];
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY,
-        },
-        body,
-      }
-    );
-    data = await response.json();
-    const retryable = response.status === 503 || response.status === 429;
-    if (!data.error || !retryable) break;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  if (data.error) {
-    throw new Error(data.error.message || "Gemini API error");
-  }
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json" },
+    })
+  );
 
   const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) throw new Error("Empty response from Gemini");
@@ -128,4 +187,57 @@ export async function sendTalkTurn(
     replyTranslation: parsed.replyTranslation ?? "",
     languageCode: parsed.languageCode ?? "",
   };
+}
+
+export interface WritingFeedback {
+  score: number; // 1-10
+  corrected: string;
+  mistakes: { wrong: string; right: string; why: string }[]; // why is in Marathi
+  tip: string; // Marathi
+}
+
+// AI checks an English writing task and explains every mistake in Marathi
+export async function checkWriting(task: string, text: string): Promise<WritingFeedback> {
+  const system =
+    `You are Bolu, an English writing teacher for a Marathi speaker who is a beginner.\n` +
+    `Task given to the student: ${task}\n` +
+    `Check the student's English text. Return ONLY JSON with keys:\n` +
+    `score (integer 1-10), corrected (the full corrected text in simple natural English), ` +
+    `mistakes (array of {wrong, right, why}; "why" is a short simple explanation in MARATHI; empty array if no mistakes), ` +
+    `tip (one encouraging tip in MARATHI).`;
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    })
+  );
+  const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Empty response from Gemini");
+  const p = JSON.parse(raw.replace(/```json/g, "").replace(/```/g, "").trim());
+  return {
+    score: Number(p.score) || 0,
+    corrected: p.corrected ?? "",
+    mistakes: Array.isArray(p.mistakes) ? p.mistakes : [],
+    tip: p.tip ?? "",
+  };
+}
+
+// Natural human-like voice. Returns base64 WAV (24 kHz, mono, 16-bit).
+export async function synthesizeSpeech(text: string, voiceName: string): Promise<string> {
+  const data = await geminiRequest(
+    [GEMINI_TTS_MODEL],
+    JSON.stringify({
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+      },
+    }),
+    20000
+  );
+  const audio: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audio) throw new Error("No audio returned");
+  return audio;
 }
