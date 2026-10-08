@@ -5,7 +5,7 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
-} from "firebase/firestore";
+} from "firebase/firestore/lite";
 
 export interface UserProfile {
   uid: string;
@@ -99,7 +99,7 @@ export async function updateUserProgress(
   });
 }
 
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore/lite";
 
 // Save a mistake to the mistake_book collection
 export async function saveMistake(uid: string, originalText: string, correctedText: string, explanation: string) {

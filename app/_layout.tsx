@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import GestureRoot from "../lib/GestureRoot";
 import { AuthProvider, useAuth } from "../lib/useAuth";
 import { useEffect } from "react";
 
@@ -34,13 +34,13 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureRoot>
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <AuthProvider>
           <RootLayoutNav />
         </AuthProvider>
       </SafeAreaProvider>
-    </GestureHandlerRootView>
+    </GestureRoot>
   );
 }
