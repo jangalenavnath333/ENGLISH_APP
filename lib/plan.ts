@@ -26,6 +26,7 @@ export interface PlanDay {
   grammar: GrammarLesson[];
   verbs: VerbForm[];
   speakingTopics: string[]; // ids from TOPICS in lib/gemini.ts
+  sentences: string[]; // Marathi sentences the student must say in English
   writingPrompt: string;
   writingPromptMr: string;
 }
@@ -84,6 +85,7 @@ export const PLAN: PlanDay[] = [
       { v1: "make", v2: "made", v3: "made", meaning: "बनवणे" },
     ],
     speakingTopics: ["intro", "cafe"],
+    sentences: ["माझं नाव राहुल आहे.","मी पुण्यात राहतो.","मला चहा आवडतो.","तुझं नाव काय आहे?","कृपया मला मदत करा."],
     writingPrompt: "Write 5 sentences about yourself: your name, city, work or study, and what you like.",
     writingPromptMr: "स्वतःबद्दल ५ वाक्यं लिहा: नाव, शहर, काम/शिक्षण आणि तुम्हाला काय आवडतं.",
   },
@@ -140,6 +142,7 @@ export const PLAN: PlanDay[] = [
       { v1: "tell", v2: "told", v3: "told", meaning: "सांगणे" },
     ],
     speakingTopics: ["daily", "shop"],
+    sentences: ["मी काल बाजारात गेलो.","तू जेवण केलंस का?","मी सकाळी सात वाजता उठलो.","तिने मला फोन केला नाही.","तू कुठे राहतोस?"],
     writingPrompt: "Write 5 sentences about what you did yesterday. Use past tense (went, ate, saw...).",
     writingPromptMr: "काल तुम्ही काय केलं त्याबद्दल ५ वाक्यं लिहा. भूतकाळ वापरा (went, ate, saw...).",
   },
@@ -196,6 +199,7 @@ export const PLAN: PlanDay[] = [
       { v1: "begin", v2: "began", v3: "begun", meaning: "सुरू करणे" },
     ],
     speakingTopics: ["travel", "free"],
+    sentences: ["मी उद्या ऑफिसला जाणार आहे.","मला एक तिकीट पाहिजे.","बस स्टॉप कुठे आहे?","मला थोडं इंग्रजी बोलता येतं.","आपण आत्ता निघायला पाहिजे."],
     writingPrompt: "Write 5 sentences about your plans for next week. Use will and going to.",
     writingPromptMr: "पुढच्या आठवड्यातल्या तुमच्या प्लॅन्सबद्दल ५ वाक्यं लिहा. will आणि going to वापरा.",
   },
@@ -252,6 +256,7 @@ export const PLAN: PlanDay[] = [
       { v1: "pay", v2: "paid", v3: "paid", meaning: "पैसे देणे" },
     ],
     speakingTopics: ["free", "intro"],
+    sentences: ["मी थकलो होतो, म्हणून लवकर झोपलो.","मला जायचं आहे, पण वेळ नाही.","मी आत्ता इंग्रजी शिकत आहे.","पाऊस पडला तर मी घरी राहीन.","मला वाटतं हा चांगला विचार आहे."],
     writingPrompt:
       "Write a short paragraph (6-8 sentences) about your week: what you learned, what was difficult, and your plan to keep learning. Use because, but and so.",
     writingPromptMr:

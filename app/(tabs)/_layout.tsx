@@ -1,7 +1,9 @@
 import { Tabs } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useUsageTracker } from "../../lib/usage";
 
 export default function TabsLayout() {
+  useUsageTracker();
   return (
     <Tabs
       screenOptions={{
@@ -41,6 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="learn"
         options={{
+          href: null,
           title: "Learn",
           tabBarIcon: ({ color }) => <Ionicons name="book-outline" size={24} color={color} />,
         }}
@@ -48,6 +51,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="practice"
         options={{
+          href: null,
           title: "Practice",
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="auto-fix" size={24} color={color} />,
         }}
@@ -73,6 +77,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="assess"
         options={{
+          href: null,
           title: "Assess",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "checkbox" : "checkbox-outline"} size={24} color={color} />

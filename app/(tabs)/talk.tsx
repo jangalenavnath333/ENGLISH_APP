@@ -38,6 +38,7 @@ import {
   TalkTurn,
 } from "../../lib/gemini";
 import { playWavBase64, stopPlayback, blobUriToWavBase64 } from "../../lib/audio";
+import { bump } from "../../lib/usage";
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
 
@@ -176,6 +177,7 @@ export default function TalkScreen() {
     try {
       const turn = await sendTalkTurn(language.name, history(), input, { tutor, topic: activeTopic });
       setEntries((prev) => [...prev, { userText: input.start ? "" : input.text ?? "🎤", turn }]);
+      if (!input.start) bump("talkTurns");
       speak(turn.reply, turn.languageCode);
     } catch (e: any) {
       setStatus("idle");

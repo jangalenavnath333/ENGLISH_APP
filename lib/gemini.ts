@@ -224,6 +224,86 @@ export async function checkWriting(task: string, text: string): Promise<WritingF
   };
 }
 
+export interface SentenceFeedback {
+  transcript: string; // what the student said/wrote
+  isCorrect: boolean;
+  score: number; // 1-10
+  corrected: string; // best natural English version
+  explanation: string; // Marathi
+}
+
+// Student translates a Marathi sentence into English (typed or spoken); AI checks it.
+export async function checkSentence(
+  marathi: string,
+  input: { text?: string; audioBase64?: string; audioMimeType?: string }
+): Promise<SentenceFeedback> {
+  const system =
+    `You are Bolu, an English teacher for a Marathi-speaking beginner.\n` +
+    `The student must say this Marathi sentence in English: "${marathi}"\n` +
+    `If audio is given, first transcribe exactly what the student said (in English). ` +
+    `Judge whether the English conveys the same meaning with correct grammar.\n` +
+    `Return ONLY JSON with keys: transcript, isCorrect (boolean), score (integer 1-10), ` +
+    `corrected (the best simple natural English sentence for the Marathi meaning), ` +
+    `explanation (short, simple, in MARATHI: what was wrong, or praise if correct).`;
+  const parts: any[] = input.audioBase64
+    ? [{ inline_data: { mime_type: input.audioMimeType || "audio/wav", data: input.audioBase64 } }]
+    : [{ text: input.text ?? "" }];
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json" },
+    })
+  );
+  const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Empty response from Gemini");
+  const p = JSON.parse(raw.replace(/```json/g, "").replace(/```/g, "").trim());
+  return {
+    transcript: p.transcript ?? input.text ?? "",
+    isCorrect: !!p.isCorrect,
+    score: Number(p.score) || 0,
+    corrected: p.corrected ?? "",
+    explanation: p.explanation ?? "",
+  };
+}
+
+export interface WordInfo {
+  word: string;
+  partOfSpeech: string;
+  meaning: string; // Marathi
+  example: string;
+  exampleMr: string;
+  forms: string; // e.g. "go - went - gone" for verbs, "" otherwise
+}
+
+// Marathi meaning, example and verb forms of any English word or phrase
+export async function lookupWord(word: string): Promise<WordInfo> {
+  const system =
+    `You are an English-Marathi dictionary for a beginner. Return ONLY JSON with keys: ` +
+    `word, partOfSpeech (in English), meaning (Marathi), example (a simple English sentence), ` +
+    `exampleMr (Marathi translation of the example), forms ("V1 - V2 - V3" if it is a verb, else "").`;
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text: word }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    })
+  );
+  const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Empty response from Gemini");
+  const p = JSON.parse(raw.replace(/```json/g, "").replace(/```/g, "").trim());
+  return {
+    word: p.word ?? word,
+    partOfSpeech: p.partOfSpeech ?? "",
+    meaning: p.meaning ?? "",
+    example: p.example ?? "",
+    exampleMr: p.exampleMr ?? "",
+    forms: p.forms ?? "",
+  };
+}
+
 // Natural human-like voice. Returns base64 WAV (24 kHz, mono, 16-bit).
 export async function synthesizeSpeech(text: string, voiceName: string): Promise<string> {
   const data = await geminiRequest(
