@@ -20,13 +20,17 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "description": "Bolu English: learn to speak English from zero with AI teachers, Marathi explanations, daily plan and revision.",
+      "name": "Bolu English",
+      "shortName": "Bolu"
     },
     "plugins": [
       "expo-router",
       "expo-status-bar",
       "expo-web-browser",
       "expo-audio"
-    ]
+    ],
+    "description": "Bolu English: learn to speak English from zero with AI teachers, Marathi explanations, daily plan and revision."
   }
 }

@@ -4,6 +4,28 @@ import { File, Paths } from "expo-file-system";
 
 let stopCurrent: (() => void) | null = null;
 
+// iOS Safari only allows audio.play() after a user gesture. Our voice arrives after a network call,
+// so we keep ONE audio element and "unlock" it on the first tap/click with a tiny silent clip.
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+let sharedAudio: HTMLAudioElement | null = null;
+
+function getSharedAudio(): HTMLAudioElement {
+  if (!sharedAudio) sharedAudio = new Audio();
+  return sharedAudio;
+}
+
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  const unlock = () => {
+    const a = getSharedAudio();
+    a.src = SILENT_WAV;
+    a.play().then(() => a.pause()).catch(() => {});
+    document.removeEventListener("touchend", unlock);
+    document.removeEventListener("click", unlock);
+  };
+  document.addEventListener("touchend", unlock, { passive: true });
+  document.addEventListener("click", unlock);
+}
+
 export function stopPlayback() {
   stopCurrent?.();
   stopCurrent = null;
@@ -15,7 +37,8 @@ export async function playWavBase64(base64: string): Promise<void> {
 
   if (Platform.OS === "web") {
     return new Promise<void>((resolve, reject) => {
-      const audio = new Audio(`data:audio/wav;base64,${base64}`);
+      const audio = getSharedAudio();
+      audio.src = `data:audio/wav;base64,${base64}`;
       audio.volume = 1;
       stopCurrent = () => {
         audio.pause();
