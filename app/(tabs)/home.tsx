@@ -139,6 +139,15 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity style={styles.projectCard} onPress={() => router.navigate("/(tabs)/project")}>
+          <Text style={styles.actionEmoji}>🎓</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>माझा प्रोजेक्ट इंग्रजीत समजवा</Text>
+            <Text style={styles.actionSub}>स्क्रिप्ट बनवा, पाठ करा आणि प्रश्न-उत्तर सराव करा</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#145E4C" />
+        </TouchableOpacity>
+
         <View style={styles.wordCard}>
           <Text style={styles.wordTag}>आजचा शब्द</Text>
           <Text style={styles.wordText}>{wordOfDay.word}</Text>
@@ -191,6 +200,7 @@ const styles = StyleSheet.create({
   actionEmoji: { fontSize: 32 },
   actionTitle: { fontSize: 16, fontWeight: "bold", color: "#111827", marginTop: 6 },
   actionSub: { fontSize: 12, color: "#6B7280", marginTop: 2, textAlign: "center" },
+  projectCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFF7ED", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#FED7AA" },
   wordCard: { backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#E5E7EB" },
   wordTag: { fontSize: 11, fontWeight: "bold", color: "#6B7280", letterSpacing: 0.5 },
   wordText: { fontSize: 26, fontWeight: "800", color: "#111827", marginTop: 6 },

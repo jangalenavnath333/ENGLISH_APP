@@ -309,6 +309,41 @@ export async function lookupWord(word: string): Promise<WordInfo> {
   };
 }
 
+export interface ProjectScript {
+  title: string;
+  sections: { title: string; titleMr: string; sentences: { en: string; mr: string }[] }[];
+  questions: { q: string; qMr: string; a: string; aMr: string }[];
+}
+
+// Turns a project description (Marathi or English) into a simple English presentation script + likely questions
+export async function generateProjectScript(description: string): Promise<ProjectScript> {
+  const system =
+    `You are an English coach for a Marathi-speaking beginner who must explain their project in English in 3-5 minutes.\n` +
+    `Write a presentation script using ONLY simple, common words and SHORT sentences (max 12 words each). Never invent facts: use only what the student wrote.\n` +
+    `Return ONLY JSON: {"title": string, "sections": [{"title": string, "titleMr": string, "sentences": [{"en": string, "mr": string}]}], ` +
+    `"questions": [{"q": string, "qMr": string, "a": string, "aMr": string}]}.\n` +
+    `Sections in order: Introduction, The Problem, My Solution, Main Features, Technology Used, My Role, Conclusion (skip a section if the student gave no information for it). ` +
+    `Each section has 2-4 sentences. "mr" is the natural Marathi meaning of each sentence. ` +
+    `Give 6 questions a teacher or interviewer would likely ask about this project, each with a short simple answer (1-2 sentences) and Marathi translations.`;
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text: description }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    }),
+    30000
+  );
+  const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Empty response from Gemini");
+  const p = JSON.parse(raw.replace(/```json/g, "").replace(/```/g, "").trim());
+  return {
+    title: p.title ?? "My Project",
+    sections: Array.isArray(p.sections) ? p.sections : [],
+    questions: Array.isArray(p.questions) ? p.questions : [],
+  };
+}
+
 // Natural human-like voice. Returns base64 WAV (24 kHz, mono, 16-bit).
 export async function synthesizeSpeech(text: string, voiceName: string): Promise<string> {
   const data = await geminiRequest(
