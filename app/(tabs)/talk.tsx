@@ -147,28 +147,44 @@ export default function TalkScreen() {
     setStatus((s) => (s === "speaking" ? "idle" : s));
   };
 
-  // Natural Gemini voice; falls back to the device voice if it fails
   const speak = async (text: string, lang?: string) => {
     if (!text) return;
     stopSpeaking();
     setStatus("thinking");
-    try {
-      const wav = await synthesizeSpeech(text, tutor.voice);
-      setStatus("speaking");
-      await playWavBase64(wav);
-    } catch {
-      setStatus("speaking");
-      await new Promise<void>((resolve) =>
-        Speech.speak(text, {
-          language: lang || language.speech,
-          rate: 0.9,
-          volume: 1,
-          onDone: () => resolve(),
-          onStopped: () => resolve(),
-          onError: () => resolve(),
-        })
-      );
+    
+    // Check if the text contains Marathi (Devanagari) characters
+    const hasMarathi = /[\u0900-\u097F]/.test(text);
+    
+    // Gemini TTS English voices (Kore/Charon) sound terrible when reading Marathi.
+    // So for Marathi text, we skip Gemini TTS and directly use native Expo Speech (with hi-IN for best Marathi pronunciation).
+    if (!hasMarathi) {
+      try {
+        const wav = await synthesizeSpeech(text, tutor.voice);
+        setStatus("speaking");
+        await playWavBase64(wav);
+        setStatus((s) => (s === "speaking" ? "idle" : s));
+        return;
+      } catch (e) {
+        console.log("Gemini TTS failed, falling back to native:", e);
+      }
     }
+
+    // Native fallback (or direct for Marathi)
+    setStatus("speaking");
+    let speechLang = lang || language.speech;
+    // Android/iOS sometimes lack mr-IN, but hi-IN reads Devanagari perfectly.
+    if (hasMarathi || speechLang === 'mr-IN') speechLang = 'hi-IN';
+
+    await new Promise<void>((resolve) =>
+      Speech.speak(text, {
+        language: speechLang,
+        rate: 0.85,
+        volume: 1,
+        onDone: () => resolve(),
+        onStopped: () => resolve(),
+        onError: () => resolve(),
+      })
+    );
     setStatus((s) => (s === "speaking" ? "idle" : s));
   };
 
