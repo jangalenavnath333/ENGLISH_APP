@@ -1,9 +1,13 @@
 /**
  * Vercel Cron API — runs daily at 8 PM IST (14:30 UTC)
- * Sends WhatsApp reminder to users who haven't opened the app today
+ * Sends FREE WhatsApp reminder via CallMeBot to users who haven't opened the app today
  *
- * Vercel cron config is in vercel.json
- * Env vars needed: WHATSAPP_API_TOKEN, WHATSAPP_PHONE_NUMBER_ID, FIREBASE_SERVICE_ACCOUNT_KEY
+ * CallMeBot is FREE — no Meta Business API needed!
+ * User must register once at: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+ *
+ * Vercel env vars needed:
+ *   CRON_SECRET — any random string for security
+ *   FIREBASE_SERVICE_ACCOUNT_KEY — Firebase Admin JSON
  */
 
 import { initializeApp, getApps, cert } from "firebase-admin/app";
@@ -20,44 +24,31 @@ function getAdminDb() {
   return getFirestore();
 }
 
-// Send WhatsApp message via Meta Business API
-async function sendWhatsAppMessage(phoneNumber: string, userName: string) {
-  const token = process.env.WHATSAPP_API_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-  if (!token || !phoneNumberId) {
-    throw new Error("WhatsApp API credentials missing");
-  }
-
-  const response = await fetch(
-    `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: phoneNumber,
-        type: "text",
-        text: {
-          body: `🙏 नमस्ते ${userName}!\n\nआज तुम्ही *Bolu English* ॲप उघडलं नाही. 📚\n\n5 मिनिटे practice करा — streak तुटू देऊ नका! 🔥\n\n👉 https://bolu-english.vercel.app\n\nशुभेच्छा! 💪`,
-        },
-      }),
-    }
+// Send FREE WhatsApp message via CallMeBot
+// User must register their number once at callmebot.com to get apikey
+async function sendWhatsAppMessage(
+  phoneNumber: string,  // format: +919876543210
+  apiKey: string,       // user's CallMeBot API key (stored in Firebase)
+  userName: string
+) {
+  const message = encodeURIComponent(
+    `🙏 नमस्ते ${userName}!\n\n` +
+    `आज तुम्ही *Bolu English* app उघडलं नाही 📚\n\n` +
+    `5 मिनिटे practice करा — streak तुटू देऊ नका! 🔥\n\n` +
+    `👉 https://bolu-english.vercel.app`
   );
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(`WhatsApp API error: ${JSON.stringify(err)}`);
-  }
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumber}&text=${message}&apikey=${apiKey}`;
 
-  return response.json();
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`CallMeBot error: ${response.status}`);
+  }
+  return true;
 }
 
 export default async function handler(req: Request) {
-  // Security: Only allow Vercel Cron or requests with CRON_SECRET
+  // Security: Only allow Vercel Cron
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -68,16 +59,14 @@ export default async function handler(req: Request) {
     const db = getAdminDb();
     const today = new Date().toISOString().split("T")[0];
 
-    // Get all users who have a WhatsApp number but haven't been active today
     const usersSnap = await db.collection("users").get();
-
     const results = { sent: 0, skipped: 0, errors: 0 };
 
     for (const userDoc of usersSnap.docs) {
       const user = userDoc.data();
 
-      // Skip: no WhatsApp number or guest users
-      if (!user.whatsappNumber || user.whatsappNumber === "") {
+      // Skip: no WhatsApp number or no CallMeBot API key
+      if (!user.whatsappNumber || !user.callmebotApiKey) {
         results.skipped++;
         continue;
       }
@@ -88,9 +77,13 @@ export default async function handler(req: Request) {
         continue;
       }
 
-      // Send WhatsApp reminder
+      // Send free WhatsApp reminder
       try {
-        await sendWhatsAppMessage(user.whatsappNumber, user.name || "मित्र");
+        await sendWhatsAppMessage(
+          user.whatsappNumber,
+          user.callmebotApiKey,
+          user.name || "मित्र"
+        );
         results.sent++;
       } catch (e: any) {
         console.error(`Failed to send to ${user.whatsappNumber}:`, e.message);
@@ -98,7 +91,7 @@ export default async function handler(req: Request) {
       }
     }
 
-    console.log(`WhatsApp Reminder Results:`, results);
+    console.log("WhatsApp Reminder Results:", results);
     return new Response(
       JSON.stringify({ success: true, date: today, ...results }),
       { status: 200, headers: { "Content-Type": "application/json" } }
@@ -111,3 +104,4 @@ export default async function handler(req: Request) {
     );
   }
 }
+

@@ -11,7 +11,8 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  whatsappNumber: string; // WhatsApp number for daily reminders
+  whatsappNumber: string;
+  callmebotApiKey: string; // CallMeBot API key for free WhatsApp reminders
   xp: number;
   streak: number;
   level: string;
@@ -33,6 +34,7 @@ export async function createUserProfile(uid: string, data: Partial<UserProfile>)
       name: data.name || "User",
       email: data.email || "",
       whatsappNumber: data.whatsappNumber || "",
+      callmebotApiKey: data.callmebotApiKey || "",
       xp: 0,
       streak: 0,
       level: "Elementary Level 1",
