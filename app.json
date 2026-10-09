@@ -29,7 +29,14 @@
       "expo-router",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "description": "Bolu English: learn to speak English from zero with AI teachers, Marathi explanations, daily plan and revision."
   }

@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import GestureRoot from "../lib/GestureRoot";
 import { AuthProvider, useAuth } from "../lib/useAuth";
+import { setupDailyReminder } from "../lib/notifications";
 import { useEffect } from "react";
 
 function RootLayoutNav() {
@@ -11,6 +12,7 @@ function RootLayoutNav() {
   const router = useRouter();
 
   useEffect(() => {
+    setupDailyReminder();
     if (loading) return;
 
     const inTabsGroup = segments[0] === "(tabs)";
