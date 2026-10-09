@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { onAuthStateChanged, User, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { getUserProfile, createUserProfile, UserProfile } from './userService';
+import { getUserProfile, createUserProfile, updateLastActive, UserProfile } from './userService';
 
 interface AuthContextType {
   user: User | null;
@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   loginAsGuest: () => Promise<void>;
   loginWithEmail: (e: string, p: string) => Promise<void>;
-  registerWithEmail: (e: string, p: string, name: string) => Promise<void>;
+  registerWithEmail: (e: string, p: string, name: string, whatsapp?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -46,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await createUserProfile(authUser.uid, {
           name: authUser.isAnonymous ? "Guest User" : authUser.displayName || "Learner",
         });
+        // Track daily app open for WhatsApp reminders
+        await updateLastActive(authUser.uid);
         await refreshProfile(authUser.uid);
       } else {
         setProfile(null);
@@ -78,12 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const registerWithEmail = async (email: string, pass: string, name: string) => {
+  const registerWithEmail = async (email: string, pass: string, name: string, whatsapp?: string) => {
     try {
       setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      // Create user profile with their provided name
-      await createUserProfile(cred.user.uid, { name });
+      // Create user profile with their provided name and WhatsApp number
+      await createUserProfile(cred.user.uid, { name, whatsappNumber: whatsapp || '' });
       // Immediately sign out so user is forced to log in manually
       await signOut(auth);
     } catch (error) {

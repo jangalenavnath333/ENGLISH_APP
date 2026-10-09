@@ -11,12 +11,14 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
+  whatsappNumber: string; // WhatsApp number for daily reminders
   xp: number;
   streak: number;
   level: string;
   currentLesson: number;
   completedLessons: number[];
   lastPracticeDate: string | null;
+  lastActiveDate: string | null; // tracks daily app open for WhatsApp reminders
   createdAt: any;
 }
 
@@ -30,12 +32,14 @@ export async function createUserProfile(uid: string, data: Partial<UserProfile>)
       uid,
       name: data.name || "User",
       email: data.email || "",
+      whatsappNumber: data.whatsappNumber || "",
       xp: 0,
       streak: 0,
       level: "Elementary Level 1",
       currentLesson: 1,
       completedLessons: [],
       lastPracticeDate: null,
+      lastActiveDate: null,
       createdAt: serverTimestamp(),
       ...data,
     });
@@ -99,7 +103,18 @@ export async function updateUserProgress(
   });
 }
 
-import { collection, addDoc } from "firebase/firestore/lite";
+// Update lastActiveDate every time the app is opened
+export async function updateLastActive(uid: string) {
+  const userRef = doc(db, "users", uid);
+  const today = new Date().toISOString().split("T")[0];
+  try {
+    await updateDoc(userRef, { lastActiveDate: today });
+  } catch (e) {
+    // ignore if profile not yet created
+  }
+}
+
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore/lite";
 
 // Save a mistake to the mistake_book collection
 export async function saveMistake(uid: string, originalText: string, correctedText: string, explanation: string) {

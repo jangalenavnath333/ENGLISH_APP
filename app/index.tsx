@@ -12,6 +12,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -45,13 +46,19 @@ export default function LoginScreen() {
       Alert.alert("थांबा!", "पासवर्ड किमान ६ अक्षरांचा असावा.");
       return;
     }
+    if (whatsappNumber && whatsappNumber.replace(/\D/g, '').length < 10) {
+      Alert.alert("थांबा!", "WhatsApp number योग्य असावा (किमान 10 अंक).");
+      return;
+    }
     setLocalLoading(true);
     try {
       const formattedEmail = email.includes('@') ? email.trim() : `${email.trim()}@bolu.app`;
-      await registerWithEmail(formattedEmail, password, name);
+      const formattedPhone = whatsappNumber ? `+91${whatsappNumber.replace(/\D/g, '').slice(-10)}` : '';
+      await registerWithEmail(formattedEmail, password, name, formattedPhone);
       Alert.alert("अभिनंदन!", "तुमचं अकाउंट तयार झालं आहे! आता लॉगिन करा.");
       setPassword('');
       setConfirmPassword('');
+      setWhatsappNumber('');
       setView('login');
     } catch (e: any) {
       Alert.alert("एरर (Error)", "अकाउंट बनवता आले नाही. तुम्ही Firebase Console मध्ये 'Email/Password' चालू केले आहे का ते तपासा! \n\n(" + e.message + ")");
@@ -207,6 +214,22 @@ export default function LoginScreen() {
               autoCapitalize="none"
               placeholderTextColor="#9CA3AF"
             />
+            {/* WhatsApp Number - Optional */}
+            <View style={styles.whatsappContainer}>
+              <View style={styles.whatsappPrefix}>
+                <Text style={styles.whatsappFlag}>🇮🇳 +91</Text>
+              </View>
+              <TextInput
+                style={styles.whatsappInput}
+                placeholder="WhatsApp Number (Optional)"
+                value={whatsappNumber}
+                onChangeText={setWhatsappNumber}
+                keyboardType="phone-pad"
+                maxLength={10}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+            <Text style={styles.whatsappHint}>📲 रोज reminder येईल की आज app वापरलात का?</Text>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
@@ -291,5 +314,10 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, padding: 16, fontSize: 16, color: '#111827' },
   eyeIcon: { padding: 4 },
   backBtn: { paddingVertical: 12, alignItems: 'center' },
-  backBtnText: { color: '#6B7280', fontSize: 14, fontWeight: '600' }
+  backBtnText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
+  whatsappContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#25D366', borderRadius: 12 },
+  whatsappPrefix: { paddingHorizontal: 14, paddingVertical: 16, borderRightWidth: 1, borderRightColor: '#E5E7EB' },
+  whatsappFlag: { fontSize: 14, fontWeight: '700', color: '#25D366' },
+  whatsappInput: { flex: 1, padding: 16, fontSize: 16, color: '#111827' },
+  whatsappHint: { fontSize: 12, color: '#25D366', textAlign: 'center', marginTop: -8 },
 });
