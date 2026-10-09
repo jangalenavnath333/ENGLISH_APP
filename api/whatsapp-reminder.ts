@@ -1,13 +1,14 @@
 /**
  * Vercel Cron API — runs daily at 8 PM IST (14:30 UTC)
- * Sends FREE WhatsApp reminder via CallMeBot to users who haven't opened the app today
+ * Sends WhatsApp reminder to users who haven't opened the app today
  *
- * CallMeBot is FREE — no Meta Business API needed!
- * User must register once at: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+ * Uses Official Meta WhatsApp Business API (Secure & End-to-End Encrypted)
  *
  * Vercel env vars needed:
- *   CRON_SECRET — any random string for security
- *   FIREBASE_SERVICE_ACCOUNT_KEY — Firebase Admin JSON
+ *   WHATSAPP_API_TOKEN
+ *   WHATSAPP_PHONE_NUMBER_ID
+ *   CRON_SECRET
+ *   FIREBASE_SERVICE_ACCOUNT_KEY
  */
 
 import { initializeApp, getApps, cert } from "firebase-admin/app";
@@ -24,27 +25,45 @@ function getAdminDb() {
   return getFirestore();
 }
 
-// Send FREE WhatsApp message via CallMeBot
-// User must register their number once at callmebot.com to get apikey
-async function sendWhatsAppMessage(
-  phoneNumber: string,  // format: +919876543210
-  apiKey: string,       // user's CallMeBot API key (stored in Firebase)
-  userName: string
-) {
-  const message = encodeURIComponent(
-    `🙏 नमस्ते ${userName}!\n\n` +
-    `आज तुम्ही *Bolu English* app उघडलं नाही 📚\n\n` +
-    `5 मिनिटे practice करा — streak तुटू देऊ नका! 🔥\n\n` +
-    `👉 https://bolu-english.vercel.app`
+// Send WhatsApp message via Official Meta Business API
+async function sendWhatsAppMessage(phoneNumber: string, userName: string) {
+  const token = process.env.WHATSAPP_API_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!token || !phoneNumberId) {
+    throw new Error("WhatsApp API credentials missing");
+  }
+
+  // Format phone number to E.164 without '+'
+  const formattedPhone = phoneNumber.replace(/\D/g, '');
+
+  const response = await fetch(
+    `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: formattedPhone,
+        type: "text",
+        text: {
+          preview_url: true,
+          body: `🙏 नमस्ते ${userName}!\n\nआज तुम्ही *Bolu English* app उघडलं नाही. 📚\n\n5 मिनिटे practice करा — streak तुटू देऊ नका! 🔥\n\n👉 https://bolu-english.vercel.app\n\nशुभेच्छा! 💪`,
+        },
+      }),
+    }
   );
 
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumber}&text=${message}&apikey=${apiKey}`;
-
-  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`CallMeBot error: ${response.status}`);
+    const err = await response.json();
+    throw new Error(`WhatsApp API error: ${JSON.stringify(err)}`);
   }
-  return true;
+
+  return response.json();
 }
 
 export default async function handler(req: Request) {
@@ -65,8 +84,8 @@ export default async function handler(req: Request) {
     for (const userDoc of usersSnap.docs) {
       const user = userDoc.data();
 
-      // Skip: no WhatsApp number or no CallMeBot API key
-      if (!user.whatsappNumber || !user.callmebotApiKey) {
+      // Skip: no WhatsApp number
+      if (!user.whatsappNumber || user.whatsappNumber === "") {
         results.skipped++;
         continue;
       }
@@ -77,13 +96,9 @@ export default async function handler(req: Request) {
         continue;
       }
 
-      // Send free WhatsApp reminder
+      // Send official WhatsApp reminder
       try {
-        await sendWhatsAppMessage(
-          user.whatsappNumber,
-          user.callmebotApiKey,
-          user.name || "मित्र"
-        );
+        await sendWhatsAppMessage(user.whatsappNumber, user.name || "मित्र");
         results.sent++;
       } catch (e: any) {
         console.error(`Failed to send to ${user.whatsappNumber}:`, e.message);
