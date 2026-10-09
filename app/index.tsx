@@ -5,7 +5,7 @@ import { useAuth } from "../lib/useAuth";
 import { useState } from "react";
 
 export default function LoginScreen() {
-  const { loginAsGuest, loginWithEmail, registerWithEmail, loading: authLoading } = useAuth();
+  const { loginWithEmail, registerWithEmail, loading: authLoading } = useAuth();
   
   const [view, setView] = useState<'home' | 'login' | 'register'>('home');
   const [email, setEmail] = useState('');
@@ -46,8 +46,8 @@ export default function LoginScreen() {
       Alert.alert("थांबा!", "पासवर्ड किमान ६ अक्षरांचा असावा.");
       return;
     }
-    if (whatsappNumber && whatsappNumber.replace(/\D/g, '').length < 10) {
-      Alert.alert("थांबा!", "WhatsApp number योग्य असावा (किमान 10 अंक).");
+    if (!whatsappNumber || whatsappNumber.replace(/\D/g, '').length < 10) {
+      Alert.alert("थांबा!", "WhatsApp number टाकणे आवश्यक आहे (10 अंक).");
       return;
     }
     setLocalLoading(true);
@@ -67,17 +67,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGuestLogin = async () => {
-    setLocalLoading(true);
-    try {
-      await loginAsGuest();
-      router.replace("/(tabs)/home");
-    } catch (e) {
-      Alert.alert("Error", "Guest login failed.");
-    } finally {
-      setLocalLoading(false);
-    }
-  };
 
   const isLoading = authLoading || localLoading;
 
@@ -131,27 +120,16 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Main Buttons */}
+            {/* Main Buttons - Only Login and Register */}
             <View style={styles.loginSection}>
               <TouchableOpacity style={styles.primaryBtn} onPress={() => setView('login')}>
                 <Ionicons name="log-in-outline" size={20} color="#fff" />
-                <Text style={styles.primaryBtnText}>Login with Email / Username</Text>
+                <Text style={styles.primaryBtnText}>Login करा (Existing User)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.secondaryBtn} onPress={() => setView('register')}>
                 <Ionicons name="person-add-outline" size={20} color="#145E4C" />
-                <Text style={styles.secondaryBtnText}>Create Account</Text>
-              </TouchableOpacity>
-
-              <View style={styles.divider}>
-                <View style={styles.line} />
-                <Text style={styles.orText}>OR</Text>
-                <View style={styles.line} />
-              </View>
-
-              <TouchableOpacity style={styles.guestBtn} onPress={handleGuestLogin} disabled={isLoading}>
-                {isLoading ? <ActivityIndicator color="#6B7280" /> : <Ionicons name="person-outline" size={20} color="#6B7280" />}
-                <Text style={styles.guestBtnText}>Guest Entry</Text>
+                <Text style={styles.secondaryBtnText}>नवीन Account बनवा</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -214,14 +192,14 @@ export default function LoginScreen() {
               autoCapitalize="none"
               placeholderTextColor="#9CA3AF"
             />
-            {/* WhatsApp Number - Optional */}
+            {/* WhatsApp Number - REQUIRED */}
             <View style={styles.whatsappContainer}>
               <View style={styles.whatsappPrefix}>
                 <Text style={styles.whatsappFlag}>🇮🇳 +91</Text>
               </View>
               <TextInput
                 style={styles.whatsappInput}
-                placeholder="WhatsApp Number (Optional)"
+                placeholder="WhatsApp Number * (10 अंक)"
                 value={whatsappNumber}
                 onChangeText={setWhatsappNumber}
                 keyboardType="phone-pad"
@@ -229,7 +207,7 @@ export default function LoginScreen() {
                 placeholderTextColor="#9CA3AF"
               />
             </View>
-            <Text style={styles.whatsappHint}>📲 रोज reminder येईल की आज app वापरलात का?</Text>
+            <Text style={styles.whatsappHint}>📲 आवश्यक — रोज रात्री 8 वाजता reminder येईल!</Text>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
