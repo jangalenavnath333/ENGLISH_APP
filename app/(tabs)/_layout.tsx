@@ -74,6 +74,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="call"
+        options={{
+          title: "Live Call",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "call" : "call-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="assist"
         options={{
           title: "Assist",
