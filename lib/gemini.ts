@@ -1,8 +1,8 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 // Tried in order; next model is used if one is overloaded (503) or rate limited (429)
-const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.0-flash"];
-const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+const GEMINI_TTS_MODEL = "gemini-2.5-flash";
 
 export interface TalkLanguage {
   name: string;

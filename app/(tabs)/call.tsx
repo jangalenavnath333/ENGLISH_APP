@@ -164,70 +164,78 @@ export default function CallScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Live Call 📞</Text>
-        <TouchableOpacity style={styles.speakerBtn} onPress={() => setIsSpeaker(!isSpeaker)}>
-          <Ionicons name={isSpeaker ? "volume-high" : "ear"} size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.main}>
-        {status === "idle" && history.length === 0 ? (
-          <View style={styles.startWrap}>
-            <Text style={styles.desc}>Practice speaking English on a real-time voice call.</Text>
-            <TouchableOpacity style={styles.startBtn} onPress={startCall}>
-              <Ionicons name="call" size={32} color="#fff" />
-              <Text style={styles.startBtnText}>Start Call</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {status === "idle" && history.length === 0 ? (
+        <View style={styles.startWrap}>
+          <Text style={styles.startTitle}>English Voice Call</Text>
+          <Text style={styles.desc}>Practice speaking English in a real-time voice call.</Text>
+          <TouchableOpacity style={styles.startBtn} onPress={startCall}>
+            <Ionicons name="call" size={32} color="#fff" />
+            <Text style={styles.startBtnText}>Start Call</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.callWrap}>
+          <View style={styles.callHeader}>
+            <Text style={styles.contactName}>Teacher Madam</Text>
+            <Text style={styles.statusText}>
+              {status === "listening" ? "Listening... (Tap Mic to Send)" :
+               status === "thinking" ? "Thinking..." :
+               status === "speaking" ? "Teacher is speaking..." : "Waiting"}
+            </Text>
           </View>
-        ) : (
-          <View style={styles.callWrap}>
-            <Animated.View style={[styles.avatarRing, { transform: [{ scale }], borderColor: status === "listening" ? "#EF4444" : "#145E4C" }]}>
+
+          <View style={styles.avatarSection}>
+            <Animated.View style={[styles.avatarRing, { transform: [{ scale }], borderColor: status === "listening" ? "#3B82F6" : "#22C55E" }]}>
               <View style={styles.avatar}>
                 <Text style={styles.emoji}>{tutor.emoji}</Text>
               </View>
             </Animated.View>
-            
-            <Text style={styles.statusText}>
-              {status === "listening" ? "Listening... (Tap mic to send)" :
-               status === "thinking" ? "Thinking..." :
-               status === "speaking" ? "Teacher is speaking..." : "Waiting"}
-            </Text>
+          </View>
 
-            <View style={styles.controls}>
-              <TouchableOpacity style={styles.endBtn} onPress={endCall}>
-                <Ionicons name="call" size={28} color="#fff" />
+          <View style={styles.bottomControls}>
+            <View style={styles.rowControls}>
+              <TouchableOpacity style={[styles.circleBtn, !isSpeaker && styles.circleBtnActive]} onPress={() => setIsSpeaker(!isSpeaker)}>
+                <Ionicons name={isSpeaker ? "volume-high" : "ear"} size={28} color={!isSpeaker ? "#000" : "#fff"} />
+                <Text style={styles.btnLabel}>{isSpeaker ? "Speaker" : "Earpiece"}</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={[styles.micBtn, recState.isRecording && styles.micBtnActive]} onPress={toggleMic}>
-                <Ionicons name={recState.isRecording ? "send" : "mic"} size={32} color="#fff" />
+
+              <TouchableOpacity style={[styles.circleBtn, recState.isRecording && styles.circleBtnActiveBlue]} onPress={toggleMic}>
+                <Ionicons name={recState.isRecording ? "send" : "mic"} size={28} color="#fff" />
+                <Text style={styles.btnLabel}>{recState.isRecording ? "Send" : "Mic"}</Text>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity style={styles.endBtn} onPress={endCall}>
+              <Ionicons name="call" size={36} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
+            </TouchableOpacity>
           </View>
-        )}
-      </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#064E3B" },
-  header: { padding: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 24, fontWeight: "700", color: "#fff" },
-  speakerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  main: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  startWrap: { alignItems: "center" },
-  desc: { color: "#A7F3D0", fontSize: 18, textAlign: "center", marginBottom: 40, paddingHorizontal: 20 },
-  startBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#10B981", paddingVertical: 16, paddingHorizontal: 32, borderRadius: 30, gap: 12 },
-  startBtnText: { color: "#fff", fontSize: 20, fontWeight: "700" },
-  callWrap: { flex: 1, width: "100%", alignItems: "center", justifyContent: "space-between", paddingVertical: 40 },
-  avatarRing: { width: 180, height: 180, borderRadius: 90, borderWidth: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#064E3B" },
-  avatar: { width: 150, height: 150, borderRadius: 75, backgroundColor: "#E6F4EF", alignItems: "center", justifyContent: "center" },
-  emoji: { fontSize: 80 },
-  statusText: { color: "#fff", fontSize: 20, fontWeight: "600", marginTop: 40 },
-  controls: { flexDirection: "row", alignItems: "center", gap: 30, marginTop: "auto" },
-  endBtn: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#EF4444", alignItems: "center", justifyContent: "center" },
-  micBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#10B981", alignItems: "center", justifyContent: "center" },
-  micBtnActive: { backgroundColor: "#3B82F6" },
+  container: { flex: 1, backgroundColor: "#0F172A" },
+  startWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  startTitle: { fontSize: 32, fontWeight: "bold", color: "#fff", marginBottom: 16 },
+  desc: { color: "#94A3B8", fontSize: 18, textAlign: "center", marginBottom: 40 },
+  startBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#22C55E", paddingVertical: 18, paddingHorizontal: 36, borderRadius: 36, gap: 12 },
+  startBtnText: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  callWrap: { flex: 1, width: "100%", alignItems: "center", justifyContent: "space-between", paddingVertical: 20 },
+  callHeader: { alignItems: "center", marginTop: 40 },
+  contactName: { fontSize: 32, fontWeight: "300", color: "#fff", marginBottom: 8 },
+  statusText: { color: "#94A3B8", fontSize: 18, fontWeight: "400" },
+  avatarSection: { flex: 1, justifyContent: "center", alignItems: "center" },
+  avatarRing: { width: 200, height: 200, borderRadius: 100, borderWidth: 4, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)" },
+  avatar: { width: 170, height: 170, borderRadius: 85, backgroundColor: "#E6F4EF", alignItems: "center", justifyContent: "center" },
+  emoji: { fontSize: 90 },
+  bottomControls: { width: "100%", paddingHorizontal: 40, paddingBottom: 40, alignItems: "center", gap: 40 },
+  rowControls: { flexDirection: "row", width: "100%", justifyContent: "space-around" },
+  circleBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  circleBtnActive: { backgroundColor: "#fff" },
+  circleBtnActiveBlue: { backgroundColor: "#3B82F6" },
+  btnLabel: { position: "absolute", bottom: -24, color: "#cbd5e1", fontSize: 13, width: 80, textAlign: "center" },
+  endBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#EF4444", alignItems: "center", justifyContent: "center", marginTop: 20 },
 });
