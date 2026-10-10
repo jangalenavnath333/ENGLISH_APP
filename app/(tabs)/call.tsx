@@ -20,7 +20,7 @@ import {
 } from "expo-audio";
 import { File } from "expo-file-system";
 import {
-  sendTalkTurn,
+  sendCallTurn,
   synthesizeSpeech,
   TUTORS,
   TalkHistoryItem,
@@ -32,6 +32,7 @@ type CallStatus = "idle" | "listening" | "thinking" | "speaking";
 export default function CallScreen() {
   const [status, setStatus] = useState<CallStatus>("idle");
   const [history, setHistory] = useState<TalkHistoryItem[]>([]);
+  const [isSpeaker, setIsSpeaker] = useState(true);
   const [pulse] = useState(() => new Animated.Value(0));
   
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -90,7 +91,11 @@ export default function CallScreen() {
     }
     
     try {
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await setAudioModeAsync({ 
+        allowsRecording: true, 
+        playsInSilentMode: true,
+        playThroughEarpieceAndroid: !isSpeaker
+      });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setStatus("listening");
@@ -103,16 +108,20 @@ export default function CallScreen() {
     setStatus("thinking");
     try {
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      await setAudioModeAsync({ 
+        allowsRecording: false, 
+        playsInSilentMode: true,
+        playThroughEarpieceAndroid: !isSpeaker 
+      });
       const uri = recorder.uri;
       if (!uri) throw new Error("No recording found");
       
       const audioBase64 = await new File(uri).base64();
       
-      const turn = await sendTalkTurn("English", history, { audioBase64, audioMimeType: "audio/mp4" }, { tutor });
+      const turn = await sendCallTurn("English", history, { audioBase64, audioMimeType: "audio/mp4" }, { tutor });
       
       const newHistory = [...history];
-      if (turn.transcript) newHistory.push({ role: "user", text: turn.transcript });
+      newHistory.push({ role: "user", text: "(Audio)" });
       newHistory.push({ role: "tutor", text: turn.reply });
       setHistory(newHistory);
       
@@ -131,7 +140,7 @@ export default function CallScreen() {
       try {
         const wav = await synthesizeSpeech(text, tutor.voice);
         setStatus("speaking");
-        await playWavBase64(wav);
+        await playWavBase64(wav, isSpeaker);
         setStatus("idle");
         if (autoMic) toggleMic();
         return;
@@ -158,6 +167,9 @@ export default function CallScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>Live Call 📞</Text>
+        <TouchableOpacity style={styles.speakerBtn} onPress={() => setIsSpeaker(!isSpeaker)}>
+          <Ionicons name={isSpeaker ? "volume-high" : "ear"} size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
       
       <View style={styles.main}>
@@ -201,8 +213,9 @@ export default function CallScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#064E3B" },
-  header: { padding: 20, alignItems: "center" },
+  header: { padding: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontSize: 24, fontWeight: "700", color: "#fff" },
+  speakerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   main: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   startWrap: { alignItems: "center" },
   desc: { color: "#A7F3D0", fontSize: 18, textAlign: "center", marginBottom: 40, paddingHorizontal: 20 },

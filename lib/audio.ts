@@ -32,7 +32,7 @@ export function stopPlayback() {
 }
 
 // Plays a base64 WAV at full volume. Resolves when playback finishes.
-export async function playWavBase64(base64: string): Promise<void> {
+export async function playWavBase64(base64: string, isSpeaker: boolean = true): Promise<void> {
   stopPlayback();
 
   if (Platform.OS === "web") {
@@ -50,7 +50,11 @@ export async function playWavBase64(base64: string): Promise<void> {
     });
   }
 
-  await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+  await setAudioModeAsync({ 
+    playsInSilentMode: true, 
+    allowsRecording: false,
+    playThroughEarpieceAndroid: !isSpeaker 
+  });
   const file = new File(Paths.cache, "bolu-tts.wav");
   if (!file.exists) file.create();
   file.write(base64, { encoding: "base64" });

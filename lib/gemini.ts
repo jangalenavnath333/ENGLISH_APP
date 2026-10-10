@@ -191,6 +191,56 @@ export async function sendTalkTurn(
   };
 }
 
+export async function sendCallTurn(
+  language: string,
+  history: TalkHistoryItem[],
+  input: TalkInput,
+  opts: TalkOptions
+): Promise<{ reply: string; languageCode: string }> {
+  const isAuto = language === AUTO_LANGUAGE;
+  const target = isAuto ? "the same language the user's latest message is in" : language;
+
+  const system =
+    `You are Bolu, ${opts.tutor.title}, a friendly conversation tutor for a Marathi speaker.\n` +
+    `The user is on a live voice call practicing ${target}. ` +
+    `Reply in 1 or 2 short sentences. Be extremely fast and conversational. Ask a question back to keep it going. Do not output JSON.`;
+
+  const historyText = history
+    .slice(-10)
+    .map((h) => `${h.role === "user" ? "User" : "Tutor"}: ${h.text}`)
+    .join("\n");
+
+  const parts: any[] = [];
+  if (historyText) parts.push({ text: `Conversation so far:\n${historyText}\n` });
+  
+  if (input.start) {
+    parts.push({ text: `Say a very short, warm greeting to start the call.` });
+  } else if (input.audioBase64) {
+    parts.push({
+      inline_data: { mime_type: input.audioMimeType || "audio/wav", data: input.audioBase64 },
+    });
+  } else {
+    parts.push({ text: `User: ${input.text ?? ""}` });
+  }
+
+  const data = await geminiRequest(
+    GEMINI_MODELS,
+    JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "text/plain" },
+    })
+  );
+
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error("Empty response from Gemini");
+
+  return {
+    reply: raw.trim(),
+    languageCode: "en-US",
+  };
+}
+
 export interface WritingFeedback {
   score: number; // 1-10
   corrected: string;
