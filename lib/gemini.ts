@@ -1,7 +1,7 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 // Tried in order; next model is used if one is overloaded (503) or rate limited (429)
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
 const GEMINI_TTS_MODEL = "gemini-2.5-flash";
 
 export interface TalkLanguage {
@@ -196,14 +196,18 @@ export async function sendCallTurn(
   history: TalkHistoryItem[],
   input: TalkInput,
   opts: TalkOptions
-): Promise<{ reply: string; languageCode: string }> {
+): Promise<{ transcript: string; reply: string; languageCode: string }> {
   const isAuto = language === AUTO_LANGUAGE;
   const target = isAuto ? "the same language the user's latest message is in" : language;
 
   const system =
     `You are Bolu, ${opts.tutor.title}, a friendly conversation tutor for a Marathi speaker.\n` +
     `The user is on a live voice call practicing ${target}. ` +
-    `Reply in 1 or 2 short sentences. Be extremely fast and conversational. Ask a question back to keep it going. Do not output JSON.`;
+    `If audio is given, transcribe exactly what the user said into "transcript". If the audio is silent or has no clear speech, set transcript to "" and reply to "".\n` +
+    `If the user made a grammar mistake, gently say the correct sentence in your reply before continuing. ` +
+    `Reply in 1 or 2 short spoken sentences (no emojis, no markdown) and ask a short question back to keep the call going. ` +
+    `"languageCode" is the BCP-47 code of the language of "reply" (e.g. en-US, mr-IN). ` +
+    `Return ONLY JSON with keys: transcript, reply, languageCode.`;
 
   const historyText = history
     .slice(-10)
@@ -212,10 +216,11 @@ export async function sendCallTurn(
 
   const parts: any[] = [];
   if (historyText) parts.push({ text: `Conversation so far:\n${historyText}\n` });
-  
+
   if (input.start) {
     parts.push({ text: `Say a very short, warm greeting to start the call.` });
   } else if (input.audioBase64) {
+    parts.push({ text: "The user's new message is this audio:" });
     parts.push({
       inline_data: { mime_type: input.audioMimeType || "audio/wav", data: input.audioBase64 },
     });
@@ -228,16 +233,25 @@ export async function sendCallTurn(
     JSON.stringify({
       system_instruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "text/plain" },
-    })
+      generationConfig: { responseMimeType: "application/json" },
+    }),
+    15000
   );
 
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const raw: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) throw new Error("Empty response from Gemini");
 
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw.replace(/```json/g, "").replace(/```/g, "").trim());
+  } catch {
+    // Model ignored the JSON format: treat the whole text as the reply
+    parsed = { transcript: "", reply: raw.trim() };
+  }
   return {
-    reply: raw.trim(),
-    languageCode: "en-US",
+    transcript: String(parsed.transcript ?? "").trim(),
+    reply: String(parsed.reply ?? "").trim(),
+    languageCode: parsed.languageCode || "en-US",
   };
 }
 

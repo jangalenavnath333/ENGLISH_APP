@@ -167,9 +167,9 @@ export default function PracticeScreen() {
             placeholder={isListening ? "Listening..." : "Type your response in English..."}
             value={inputText}
             onChangeText={setInputText}
-            onSubmitEditing={sendMessage}
+            onSubmitEditing={() => sendMessage()}
           />
-          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+          <TouchableOpacity style={styles.sendBtn} onPress={() => sendMessage()}>
             <Ionicons name="send" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -195,7 +195,7 @@ export default function PracticeScreen() {
             </View>
             
             <Text style={styles.modalTitle}>Great Job!</Text>
-            <Text style={styles.modalSubtitle}>You completed today's practice!</Text>
+            <Text style={styles.modalSubtitle}>You completed today&apos;s practice!</Text>
             <Text style={styles.modalSubtitleMarathi}>आजची प्रॅक्टिस पूर्ण झाली! उत्तम सुरुवात केलीस.</Text>
 
             <View style={styles.xpBadgeModal}>

@@ -214,7 +214,7 @@ export default function AssessScreen() {
 
         {/* Skip Button */}
         <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-          <Text style={styles.skipText}>मला माहित नाही · I don't know (Skip)</Text>
+          <Text style={styles.skipText}>मला माहित नाही · I don&apos;t know (Skip)</Text>
           <Ionicons name="arrow-forward" size={16} color="#4B5563" />
         </TouchableOpacity>
 

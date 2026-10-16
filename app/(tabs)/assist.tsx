@@ -18,7 +18,7 @@ export default function AssistScreen() {
     try {
       const res = await getNativeTranslation(inputText);
       setResult(res);
-    } catch (error) {
+    } catch {
       alert("Error: Couldn't translate right now.");
     } finally {
       setLoading(false);

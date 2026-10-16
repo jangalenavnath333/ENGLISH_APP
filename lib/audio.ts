@@ -50,10 +50,11 @@ export async function playWavBase64(base64: string, isSpeaker: boolean = true): 
     });
   }
 
-  await setAudioModeAsync({ 
-    playsInSilentMode: true, 
-    allowsRecording: false,
-    playThroughEarpieceAndroid: !isSpeaker 
+  // iOS only honours earpiece routing while the session is in play-and-record mode
+  await setAudioModeAsync({
+    playsInSilentMode: true,
+    allowsRecording: !isSpeaker,
+    shouldRouteThroughEarpiece: !isSpeaker,
   });
   const file = new File(Paths.cache, "bolu-tts.wav");
   if (!file.exists) file.create();

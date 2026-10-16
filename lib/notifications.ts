@@ -5,7 +5,8 @@ import { Platform } from 'react-native';
 // Behavior when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -54,7 +55,7 @@ export async function setupDailyReminder() {
       body: "आज तुम्ही ॲप वापरलात का? तुमचा आजचा टास्क पूर्ण करायला विसरू नका!",
       sound: true,
     },
-    trigger: tomorrow,
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: tomorrow },
   });
 
   console.log("Daily reminder scheduled for:", tomorrow.toLocaleString());

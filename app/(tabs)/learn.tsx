@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -76,7 +76,7 @@ export default function LearnScreen() {
         <View style={styles.conceptCard}>
           <View style={styles.conceptHeader}>
             <Ionicons name="bulb-outline" size={20} color="#D97706" />
-            <Text style={styles.conceptTitle}>Bolu's Grammar Tip</Text>
+            <Text style={styles.conceptTitle}>Bolu&apos;s Grammar Tip</Text>
           </View>
           <Text style={styles.conceptText}>{currentData.concept}</Text>
         </View>

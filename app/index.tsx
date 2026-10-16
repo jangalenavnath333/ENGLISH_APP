@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from "react-native";
-import { Link, router } from "expo-router";
+import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../lib/useAuth";
 import { useState } from "react";
@@ -26,7 +26,7 @@ export default function LoginScreen() {
       const formattedEmail = email.includes('@') ? email.trim() : `${email.trim()}@bolu.app`;
       await loginWithEmail(formattedEmail, password);
       router.replace("/(tabs)/home");
-    } catch (e: any) {
+    } catch {
       Alert.alert("चुकले!", "Email किंवा Password चुकीचा आहे. किंवा तुम्ही Firebase मध्ये Email Auth ऑन केले नसेल.");
     } finally {
       setLocalLoading(false);
@@ -113,8 +113,8 @@ export default function LoginScreen() {
                     <Ionicons name="person-circle-outline" size={24} color="#D97706" />
                   </View>
                   <View style={styles.promptTextContainer}>
-                    <Text style={styles.promptMarathi}>"मला कॅम्पस इंटरव्ह्यूची तयारी करायची ..."</Text>
-                    <Text style={styles.promptEnglish}>"I want to prepare for campus interviews."</Text>
+                    <Text style={styles.promptMarathi}>&quot;मला कॅम्पस इंटरव्ह्यूची तयारी करायची ...&quot;</Text>
+                    <Text style={styles.promptEnglish}>&quot;I want to prepare for campus interviews.&quot;</Text>
                   </View>
                 </View>
               </View>

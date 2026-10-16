@@ -24,7 +24,7 @@ function RootLayoutNav() {
       // Redirect away from the login page.
       router.replace("/(tabs)/home");
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, router]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
