@@ -77,6 +77,44 @@ export async function playWavBase64(base64: string, isSpeaker: boolean = true): 
   });
 }
 
+// A phone-style ringback tone (440 + 480 Hz for 2 s, then short silence), generated in code so no audio file is needed.
+export function makeRingbackWavBase64(): string {
+  const rate = 8000;
+  const toneSec = 2;
+  const silenceSec = 0.4;
+  const total = Math.floor(rate * (toneSec + silenceSec));
+  const wav = new DataView(new ArrayBuffer(44 + total * 2));
+  const writeStr = (o: number, s: string) => [...s].forEach((c, i) => wav.setUint8(o + i, c.charCodeAt(0)));
+  writeStr(0, "RIFF");
+  wav.setUint32(4, 36 + total * 2, true);
+  writeStr(8, "WAVEfmt ");
+  wav.setUint32(16, 16, true);
+  wav.setUint16(20, 1, true);
+  wav.setUint16(22, 1, true);
+  wav.setUint32(24, rate, true);
+  wav.setUint32(28, rate * 2, true);
+  wav.setUint16(32, 2, true);
+  wav.setUint16(34, 16, true);
+  writeStr(36, "data");
+  wav.setUint32(40, total * 2, true);
+  const toneSamples = rate * toneSec;
+  for (let i = 0; i < total; i++) {
+    let v = 0;
+    if (i < toneSamples) {
+      const t = i / rate;
+      const fade = Math.min(1, i / 200, (toneSamples - i) / 200); // avoid clicks
+      v = 0.25 * fade * (Math.sin(2 * Math.PI * 440 * t) + Math.sin(2 * Math.PI * 480 * t));
+    }
+    wav.setInt16(44 + i * 2, Math.round(v * 0x7fff), true);
+  }
+  const bytes = new Uint8Array(wav.buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
 // Web only: recorded blob (webm/ogg/mp4) -> 16 kHz mono WAV base64, which Gemini accepts for any recording format.
 export async function blobUriToWavBase64(uri: string): Promise<string> {
   const blob = await (await fetch(uri)).blob();
