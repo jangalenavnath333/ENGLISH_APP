@@ -4,8 +4,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import GestureRoot from "../lib/GestureRoot";
 import { AuthProvider, useAuth } from "../lib/useAuth";
 import { setupDailyReminder } from "../lib/notifications";
-import { useEffect } from "react";
-import { Platform } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Platform, View } from "react-native";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -30,6 +30,19 @@ function RootLayoutNav() {
       router.replace("/(tabs)/home");
     }
   }, [user, loading, segments, router]);
+
+  // Wait for the first login check so the app never flashes the wrong screen or "Learner" name on load.
+  // (Only the first check: later login/register actions toggle `loading` too and must not unmount the form.)
+  const [authChecked, setAuthChecked] = useState(false);
+  if (!loading && !authChecked) setAuthChecked(true);
+
+  if (!authChecked) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F8FAFC" }}>
+        <ActivityIndicator size="large" color="#145E4C" />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

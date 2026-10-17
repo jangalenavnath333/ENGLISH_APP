@@ -123,7 +123,13 @@ export default function TalkScreen() {
   const recState = useAudioRecorderState(recorder);
   const busy = status === "thinking";
 
+  // Follow the chat only once it has messages; on the empty start screen stay at the top
+  // (scrolling to the end on load pushed the tutor avatar out of view).
   useEffect(() => {
+    if (entries.length === 0) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return;
+    }
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [entries, status]);
 

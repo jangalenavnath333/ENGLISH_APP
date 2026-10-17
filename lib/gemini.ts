@@ -33,7 +33,7 @@ export interface Tutor {
 
 export const TUTORS: Tutor[] = [
   { id: "madam", label: "Madam", title: "a warm, patient female teacher (Madam)", emoji: "👩‍🏫", voice: "Kore" },
-  { id: "sir", label: "Sir", title: "a friendly, encouraging male teacher (Sir)", emoji: "👨‍🏫", voice: "Charon" },
+  { id: "sir", label: "Sir", title: "a friendly, encouraging male teacher (Sir)", emoji: "🧔", voice: "Charon" },
 ];
 
 export interface Topic {
