@@ -117,7 +117,11 @@ export function makeRingbackWavBase64(): string {
 
 // Web only: recorded blob (webm/ogg/mp4) -> 16 kHz mono WAV base64, which Gemini accepts for any recording format.
 export async function blobUriToWavBase64(uri: string): Promise<string> {
-  const blob = await (await fetch(uri)).blob();
+  return blobToWavBase64(await (await fetch(uri)).blob());
+}
+
+// Same conversion for a Blob we already hold in memory
+export async function blobToWavBase64(blob: Blob): Promise<string> {
   const buf = await blob.arrayBuffer();
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const decoded = await ctx.decodeAudioData(buf);

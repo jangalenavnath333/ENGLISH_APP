@@ -29,7 +29,7 @@ import {
   Tutor,
   TalkHistoryItem,
 } from "../../lib/gemini";
-import { playWavBase64, stopPlayback, blobUriToWavBase64, makeRingbackWavBase64 } from "../../lib/audio";
+import { playWavBase64, stopPlayback, blobToWavBase64, makeRingbackWavBase64 } from "../../lib/audio";
 import { bump } from "../../lib/usage";
 
 type CallStatus = "idle" | "listening" | "thinking" | "speaking" | "muted";
@@ -46,6 +46,10 @@ const SILENCE_END_MS = 1300; // silence after speech => user finished
 const MAX_UTTERANCE_MS = 25000;
 const MIN_SPEECH_MS = 350; // ignore coughs / clicks shorter than this
 const MAX_ERRORS_IN_ROW = 3;
+const CALIBRATION_POLLS = 6; // ~0.7s at the start of each turn to learn the background noise
+const VOICE_ABOVE_FLOOR_DB = 10; // speech = this much louder than the noise floor
+const MIN_VOICE_DB = -52; // ...and never quieter than this
+const NO_VOICE_HINT_MS = 9000;
 
 const FALLBACK_GREETING = "Hello! I am your English teacher. How are you doing today?";
 
@@ -93,6 +97,8 @@ export default function CallScreen() {
   const [log, setLog] = useState<LogLine[]>([]);
   const [finalSeconds, setFinalSeconds] = useState(0);
   const [finalTurns, setFinalTurns] = useState(0);
+  const [suggestion, setSuggestion] = useState("");
+  const [hearing, setHearing] = useState(false);
   const [pulse] = useState(() => new Animated.Value(0));
 
   const recorder = useAudioRecorder(RECORDING_OPTIONS);
@@ -108,6 +114,8 @@ export default function CallScreen() {
   const secondsRef = useRef(0);
   const turnsRef = useRef(0);
   const webMeterRef = useRef<WebMeter | null>(null);
+  const webRecRef = useRef<{ rec: MediaRecorder; stopped: Promise<Blob> } | null>(null);
+  const hearingRef = useRef(false);
   const tutorRef = useRef(tutor);
   const languageRef = useRef(language);
 
@@ -149,7 +157,9 @@ export default function CallScreen() {
   const startWebMeter = useCallback(async () => {
     if (Platform.OS !== "web" || webMeterRef.current) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false },
+      });
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       await ctx.resume();
       const analyser = ctx.createAnalyser();
@@ -178,6 +188,38 @@ export default function CallScreen() {
     webMeterRef.current = null;
   }, []);
 
+  // Record on the same microphone stream we already use for the level meter (no re-prompt, no re-prepare)
+  const startWebRecording = useCallback(() => {
+    const m = webMeterRef.current;
+    if (!m) throw new Error("Microphone चालू नाही. Browser मध्ये Mic permission द्या.");
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+    const rec = new MediaRecorder(m.stream, mime ? { mimeType: mime } : {});
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    const stopped = new Promise<Blob>((resolve) => {
+      rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+    });
+    rec.start();
+    webRecRef.current = { rec, stopped };
+  }, []);
+
+  const stopWebRecording = useCallback(async (): Promise<Blob | null> => {
+    const r = webRecRef.current;
+    if (!r) return null;
+    webRecRef.current = null;
+    if (r.rec.state !== "inactive") r.rec.stop();
+    return r.stopped;
+  }, []);
+
+  const updateHearing = useCallback((v: boolean) => {
+    if (hearingRef.current !== v) {
+      hearingRef.current = v;
+      setHearing(v);
+    }
+  }, []);
+
   // --- helpers -------------------------------------------------------------
   const applyAudioMode = useCallback(async (recording: boolean) => {
     try {
@@ -192,12 +234,16 @@ export default function CallScreen() {
   }, []);
 
   const stopRecorderQuietly = useCallback(async () => {
+    if (Platform.OS === "web") {
+      await stopWebRecording();
+      return;
+    }
     try {
       if (recorder.getStatus().isRecording) await recorder.stop();
     } catch {
       // recorder was not running
     }
-  }, [recorder]);
+  }, [recorder, stopWebRecording]);
 
   const hardStopAll = useCallback(() => {
     runIdRef.current += 1;
@@ -260,20 +306,30 @@ export default function CallScreen() {
   );
 
   // Record until the user stops talking (or taps "send now"). Returns audio or null if no speech.
+  // Voice detection adapts to the room: it tracks the quietest recent level as the noise floor and treats
+  // anything clearly above it as speech, so it works with different microphones and background noise.
   const recordUtterance = useCallback(
     async (runId: number): Promise<{ base64: string; mime: string } | null> => {
-      await applyAudioMode(true);
-      await recorder.prepareToRecordAsync();
-      recorder.record();
+      const isWeb = Platform.OS === "web";
+      if (isWeb) {
+        startWebRecording();
+      } else {
+        await applyAudioMode(true);
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+      }
       setStatus("listening");
+      updateHearing(false);
 
       const startedAt = Date.now();
-      let noiseFloor = -160;
-      let samples = 0;
+      let polls = 0;
+      let smooth = -100;
+      let floor = 0;
       let speechMs = 0;
       let lastVoiceAt = 0;
       let speechStartedAt = 0;
       let manualSend = false;
+      let hintShown = false;
       finishRef.current = () => {
         manualSend = true;
       };
@@ -281,21 +337,31 @@ export default function CallScreen() {
       while (runId === runIdRef.current && !mutedRef.current) {
         await sleep(POLL_MS);
         const now = Date.now();
-        const level = Platform.OS === "web" ? readWebLevel() : recorder.getStatus().metering;
+        const raw = isWeb ? readWebLevel() : recorder.getStatus().metering;
 
-        if (typeof level === "number") {
-          // first ~0.6s: learn the background noise level
-          if (samples < 5) {
-            noiseFloor = samples === 0 ? level : Math.max(noiseFloor, level);
-            samples += 1;
+        if (typeof raw === "number") {
+          polls += 1;
+          smooth = polls === 1 ? raw : smooth * 0.4 + raw * 0.6;
+          if (polls <= CALIBRATION_POLLS) {
+            // first ~0.7s: the quietest moment is the background noise
+            floor = polls === 1 ? smooth : Math.min(floor, smooth);
           } else {
-            const threshold = Math.max(-42, noiseFloor + 12);
-            if (level > threshold) {
+            if (smooth < floor) floor = smooth; // quieter: noise floor drops at once
+            else floor += (smooth - floor) * 0.02; // louder: rises slowly, so speech does not raise it
+            const isVoice = smooth > floor + VOICE_ABOVE_FLOOR_DB && smooth > MIN_VOICE_DB;
+            updateHearing(isVoice);
+            if (isVoice) {
               if (!speechStartedAt) speechStartedAt = now;
               lastVoiceAt = now;
               speechMs = now - speechStartedAt;
+              if (hintShown) setNotice("");
             }
           }
+        }
+
+        if (!speechStartedAt && !hintShown && now - startedAt > NO_VOICE_HINT_MS) {
+          hintShown = true;
+          setNotice("आवाज ऐकू येत नाही. Mic जवळ बोला किंवा तुमचा Mic चालू आहे का ते तपासा.");
         }
 
         const heardSpeech = speechMs >= MIN_SPEECH_MS;
@@ -304,19 +370,23 @@ export default function CallScreen() {
         if (now - startedAt > MAX_UTTERANCE_MS) break;
       }
       finishRef.current = null;
+      updateHearing(false);
 
-      const uri = recorder.uri;
+      const heard = speechMs >= MIN_SPEECH_MS || manualSend;
+
+      if (isWeb) {
+        const blob = await stopWebRecording();
+        if (runId !== runIdRef.current || mutedRef.current || !heard || !blob) return null;
+        return { base64: await blobToWavBase64(blob), mime: "audio/wav" };
+      }
+
       await stopRecorderQuietly();
       if (runId !== runIdRef.current || mutedRef.current) return null;
-
-      // Metering unavailable (e.g. some devices): only a manual send produces audio
-      const heard = speechMs >= MIN_SPEECH_MS || manualSend;
-      const fileUri = uri ?? recorder.uri;
+      const fileUri = recorder.uri; // read AFTER stop: it only points to this recording once stopped
       if (!heard || !fileUri) return null;
-      if (Platform.OS === "web") return { base64: await blobUriToWavBase64(fileUri), mime: "audio/wav" };
       return { base64: await new File(fileUri).base64(), mime: "audio/mp4" };
     },
-    [applyAudioMode, recorder, stopRecorderQuietly]
+    [applyAudioMode, recorder, stopRecorderQuietly, startWebRecording, stopWebRecording, updateHearing]
   );
 
   // The hands-free loop: listen -> think -> speak -> listen ...
@@ -367,6 +437,7 @@ export default function CallScreen() {
           ];
           setUserCaption(turn.transcript);
           setTutorCaption(turn.reply);
+          setSuggestion(turn.suggestion);
           addLog("you", turn.transcript);
           addLog("teacher", turn.reply);
           await speak(turn.reply, runId);
@@ -379,7 +450,7 @@ export default function CallScreen() {
             notify("Call ended", "Internet किंवा server मध्ये अडचण आहे. थोड्या वेळाने पुन्हा try करा.");
             return;
           }
-          setNotice("Network slow आहे, पुन्हा try करत आहे...");
+          setNotice(`अडचण: ${String(e?.message || "unknown").slice(0, 90)}. पुन्हा try करत आहे...`);
           await stopRecorderQuietly();
           await sleep(1200);
         }
@@ -412,6 +483,7 @@ export default function CallScreen() {
     setSeconds(0);
     setUserCaption("");
     setTutorCaption("");
+    setSuggestion("");
     setLog([]);
     setNotice("");
     setStatus("idle");
@@ -420,8 +492,8 @@ export default function CallScreen() {
 
     // The teacher's greeting is prepared while the phone "rings"
     const greetingJob = sendCallTurn(languageRef.current.name, [], { start: true }, { tutor: tutorRef.current })
-      .then((t) => t.reply || FALLBACK_GREETING)
-      .catch(() => FALLBACK_GREETING);
+      .then((t) => ({ reply: t.reply || FALLBACK_GREETING, suggestion: t.suggestion }))
+      .catch(() => ({ reply: FALLBACK_GREETING, suggestion: "I am fine, thank you." }));
 
     try {
       await applyAudioMode(false);
@@ -432,10 +504,11 @@ export default function CallScreen() {
     }
     if (runId !== runIdRef.current) return;
 
-    const greeting = await greetingJob;
+    const { reply: greeting, suggestion: firstSuggestion } = await greetingJob;
     if (runId !== runIdRef.current) return;
     setPhase("incall");
     setTutorCaption(greeting);
+    setSuggestion(firstSuggestion);
     addLog("teacher", greeting);
     historyRef.current = [{ role: "tutor", text: greeting }];
     try {
@@ -578,6 +651,11 @@ export default function CallScreen() {
           <Text style={styles.contactName}>Teacher {tutor.label}</Text>
           <Text style={styles.timer}>{ringing ? "Calling..." : formatTime(seconds)}</Text>
           <Text style={styles.statusText}>{ringing ? "रिंग वाजत आहे" : STATUS_TEXT[status]}</Text>
+          {!ringing && status === "listening" && (
+            <Text style={[styles.hearing, hearing && styles.hearingOn]}>
+              {hearing ? "🎙️ तुमचा आवाज ऐकू येतोय..." : "🎙️ बोला, मी ऐकतोय"}
+            </Text>
+          )}
           {!!notice && <Text style={styles.notice}>{notice}</Text>}
         </View>
 
@@ -597,6 +675,19 @@ export default function CallScreen() {
             {!!tutorCaption && <Text style={styles.tutorCaption}>{tutorCaption}</Text>}
             {!!userCaption && <Text style={styles.userCaption}>You: {userCaption}</Text>}
           </View>
+          {!!suggestion && status !== "thinking" && (
+            <TouchableOpacity
+              style={styles.suggestionBox}
+              activeOpacity={0.8}
+              onPress={() => {
+                Speech.stop();
+                Speech.speak(suggestion, { language: languageRef.current.speech, rate: 0.8 });
+              }}
+            >
+              <Text style={styles.suggestionLabel}>💡 असं बोला (दाबून ऐका)</Text>
+              <Text style={styles.suggestionText}>{suggestion}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.bottomControls}>
@@ -667,6 +758,11 @@ const styles = StyleSheet.create({
   contactName: { fontSize: 30, fontWeight: "300", color: "#fff", marginBottom: 4 },
   timer: { color: "#CBD5E1", fontSize: 16, marginBottom: 6 },
   statusText: { color: "#94A3B8", fontSize: 18, fontWeight: "400" },
+  hearing: { color: "#64748B", fontSize: 14, marginTop: 6 },
+  hearingOn: { color: "#4ADE80", fontWeight: "700" },
+  suggestionBox: { marginTop: 16, alignSelf: "stretch", backgroundColor: "rgba(250,204,21,0.12)", borderWidth: 1, borderColor: "rgba(250,204,21,0.4)", borderRadius: 14, padding: 12 },
+  suggestionLabel: { color: "#FACC15", fontSize: 12, fontWeight: "700", marginBottom: 4 },
+  suggestionText: { color: "#FEF9C3", fontSize: 17, lineHeight: 24 },
   notice: { color: "#FBBF24", fontSize: 14, marginTop: 8, textAlign: "center" },
   avatarSection: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
   avatarRing: { width: 190, height: 190, borderRadius: 95, borderWidth: 4, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)" },

@@ -191,34 +191,58 @@ export async function sendTalkTurn(
   };
 }
 
+export interface CallTurnResult {
+  transcript: string;
+  reply: string;
+  languageCode: string;
+  suggestion: string; // a simple sentence the student can say next ("" if none)
+}
+
 export async function sendCallTurn(
   language: string,
   history: TalkHistoryItem[],
   input: TalkInput,
   opts: TalkOptions
-): Promise<{ transcript: string; reply: string; languageCode: string }> {
+): Promise<CallTurnResult> {
   const isAuto = language === AUTO_LANGUAGE;
   const target = isAuto ? "the same language the user's latest message is in" : language;
 
   const system =
-    `You are Bolu, ${opts.tutor.title}, a friendly conversation tutor for a Marathi speaker.\n` +
-    `The user is on a live voice call practicing ${target}. ` +
-    `If audio is given, transcribe exactly what the user said into "transcript". If the audio is silent or has no clear speech, set transcript to "" and reply to "".\n` +
-    `If the user made a grammar mistake, gently say the correct sentence in your reply before continuing. ` +
-    `Reply in 1 or 2 short spoken sentences (no emojis, no markdown) and ask a short question back to keep the call going. ` +
+    `You are Bolu, ${opts.tutor.title}, a spoken-language COACH for a Marathi-speaking beginner.
+` +
+    `The user is on a live voice call learning to speak ${target}. Your job is to TEACH them how to speak, not just chat.
+` +
+    `If audio is given, transcribe exactly what the user said into "transcript". If the audio is silent or has no clear speech, set transcript, reply and suggestion to "".
+` +
+    `How to coach:
+` +
+    `1. If the user made a mistake: first say "You can say:" and the correct sentence, then ask them to repeat it or answer again.
+` +
+    `2. If the user spoke Marathi or did not know how to say something, give the simple ${target} sentence for it and ask them to repeat it.
+` +
+    `3. If the sentence was correct, praise briefly (a few words), then teach one new useful phrase or ask the next simple question.
+` +
+    `4. Always use very simple words and speak slowly in short sentences. Reply in at most 2 short spoken sentences (no emojis, no markdown).
+` +
+    `5. "suggestion" must be ONE short, easy ${target} sentence the student can say next (the answer to your question, or the sentence to repeat).
+` +
     `"languageCode" is the BCP-47 code of the language of "reply" (e.g. en-US, mr-IN). ` +
-    `Return ONLY JSON with keys: transcript, reply, languageCode.`;
+    `Return ONLY JSON with keys: transcript, reply, suggestion, languageCode.`;
 
   const historyText = history
     .slice(-10)
     .map((h) => `${h.role === "user" ? "User" : "Tutor"}: ${h.text}`)
-    .join("\n");
+    .join(String.fromCharCode(10));
 
   const parts: any[] = [];
-  if (historyText) parts.push({ text: `Conversation so far:\n${historyText}\n` });
+  if (historyText) parts.push({ text: `Conversation so far:
+${historyText}
+` });
 
   if (input.start) {
-    parts.push({ text: `Say a very short, warm greeting to start the call.` });
+    parts.push({
+      text: `Start the call: greet the student warmly in one short sentence and ask one very easy first question (for example their name or how they are). Also give the "suggestion".`,
+    });
   } else if (input.audioBase64) {
     parts.push({ text: "The user's new message is this audio:" });
     parts.push({
@@ -251,6 +275,7 @@ export async function sendCallTurn(
   return {
     transcript: String(parsed.transcript ?? "").trim(),
     reply: String(parsed.reply ?? "").trim(),
+    suggestion: String(parsed.suggestion ?? "").trim(),
     languageCode: parsed.languageCode || "en-US",
   };
 }
