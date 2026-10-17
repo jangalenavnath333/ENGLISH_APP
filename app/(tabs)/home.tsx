@@ -6,13 +6,11 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PLAN } from "../../lib/plan";
+import { PLAN, TASK_KEYS, TASKS_PER_DAY } from "../../lib/plan";
 import { getUsage, computeStreak, formatDuration, todayKey } from "../../lib/usage";
 import { getDueWords } from "../../lib/revision";
 
 const PLAN_KEY = "bolu_plan_done_v1";
-const TASKS_PER_DAY = 7;
-const TASK_KEYS = ["vocab", "quiz", "grammar", "verbs", "sentences", "speaking", "writing"];
 
 export default function HomeScreen() {
   const { profile, logout } = useAuth();

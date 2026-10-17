@@ -5,7 +5,9 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PLAN, PlanDay } from "../../lib/plan";
+import { PLAN, PlanDay, TaskKey } from "../../lib/plan";
+import { PRACTICE, PassageQuestion } from "../../lib/listening";
+import { speakNatural, speakSlow } from "../../lib/speak";
 import {
   TOPICS,
   checkWriting,
@@ -21,16 +23,16 @@ import { addWeakWord, recordRevision, getDueWords, getWeakCount, WeakWord } from
 
 const STORAGE_KEY = "bolu_plan_done_v1";
 
-type TaskKey = "vocab" | "quiz" | "grammar" | "verbs" | "sentences" | "speaking" | "writing";
-
 const TASKS: { key: TaskKey; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
   { key: "vocab", icon: "book-outline", title: "१. शब्द शिका", sub: "१५ शब्द ऐका आणि म्हणा" },
-  { key: "quiz", icon: "help-circle-outline", title: "२. क्विझ", sub: "शब्द आणि verbs लक्षात राहिले का?" },
-  { key: "grammar", icon: "construct-outline", title: "३. व्याकरण", sub: "२ सोपे नियम + उदाहरणं" },
-  { key: "verbs", icon: "swap-horizontal-outline", title: "४. Verbs (V1 V2 V3)", sub: "८ महत्त्वाचे verbs" },
-  { key: "sentences", icon: "chatbubble-ellipses-outline", title: "५. वाक्य बनवा", sub: "मराठी वाक्य इंग्रजीत सांगा (बोलून/लिहून)" },
-  { key: "speaking", icon: "mic-outline", title: "६. AI शी बोला", sub: "Madam / Sir शी गप्पा" },
-  { key: "writing", icon: "create-outline", title: "७. लिहा", sub: "AI तुमच्या चुका सांगेल" },
+  { key: "listening", icon: "headset-outline", title: "२. ऐका (Listening)", sub: "वाक्य ऐकून लिहा + गोष्ट ऐकून उत्तरं द्या" },
+  { key: "reading", icon: "newspaper-outline", title: "३. वाचा (Reading)", sub: "छोटी गोष्ट वाचा, शब्दावर दाबून अर्थ पहा" },
+  { key: "quiz", icon: "help-circle-outline", title: "४. क्विझ", sub: "शब्द आणि verbs लक्षात राहिले का?" },
+  { key: "grammar", icon: "construct-outline", title: "५. व्याकरण", sub: "२ सोपे नियम + उदाहरणं" },
+  { key: "verbs", icon: "swap-horizontal-outline", title: "६. Verbs (V1 V2 V3)", sub: "८ महत्त्वाचे verbs" },
+  { key: "sentences", icon: "chatbubble-ellipses-outline", title: "७. वाक्य बनवा", sub: "मराठी वाक्य इंग्रजीत सांगा (बोलून/लिहून)" },
+  { key: "speaking", icon: "mic-outline", title: "८. AI शी बोला", sub: "Madam / Sir शी गप्पा" },
+  { key: "writing", icon: "create-outline", title: "९. लिहा", sub: "AI तुमच्या चुका सांगेल" },
 ];
 
 const say = (text: string) => {
@@ -293,6 +295,218 @@ function SentenceTask({ day }: { day: PlanDay }) {
           </TouchableOpacity>
         </View>
       )}
+    </View>
+  );
+}
+
+// ---------- Listening & Reading ----------
+
+const normWords = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+// Which words of the original sentence did the student miss?
+function dictationDiff(original: string, typed: string) {
+  const pool = normWords(typed);
+  return original.split(/\s+/).map((w) => {
+    const n = normWords(w)[0];
+    const idx = n ? pool.indexOf(n) : -1;
+    if (idx >= 0) pool.splice(idx, 1);
+    return { word: w, ok: !n || idx >= 0 };
+  });
+}
+
+function PlayButton({ text, label }: { text: string; label: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <TouchableOpacity
+      style={styles.playBtn}
+      onPress={async () => {
+        setBusy(true);
+        await speakNatural(text);
+        setBusy(false);
+      }}
+    >
+      {busy ? <ActivityIndicator color="#145E4C" /> : <Ionicons name="volume-high" size={20} color="#145E4C" />}
+      <Text style={styles.playText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function PassageQuestions({ questions, onFinished }: { questions: PassageQuestion[]; onFinished?: () => void }) {
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  const answered = Object.keys(picked).length;
+  const correct = questions.filter((q, i) => picked[i] === q.answer).length;
+
+  return (
+    <View>
+      {questions.map((q, qi) => (
+        <View key={q.q} style={styles.qBlock}>
+          <Text style={styles.word}>{qi + 1}. {q.q}</Text>
+          <Text style={styles.example}>{q.qMr}</Text>
+          {q.options.map((o, oi) => {
+            const has = picked[qi] !== undefined;
+            const bg = has ? (oi === q.answer ? "#DCFCE7" : oi === picked[qi] ? "#FEE2E2" : "#fff") : "#fff";
+            const border = has ? (oi === q.answer ? "#22C55E" : oi === picked[qi] ? "#EF4444" : "#E5E7EB") : "#E5E7EB";
+            return (
+              <TouchableOpacity
+                key={o}
+                style={[styles.option, { backgroundColor: bg, borderColor: border }]}
+                disabled={has}
+                onPress={() => {
+                  const next = { ...picked, [qi]: oi };
+                  setPicked(next);
+                  if (Object.keys(next).length === questions.length) onFinished?.();
+                }}
+              >
+                <Text style={styles.optionText}>{o}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+      {answered === questions.length && (
+        <Text style={styles.score}>{correct}/{questions.length} बरोबर {correct === questions.length ? "🎉" : "👍"}</Text>
+      )}
+    </View>
+  );
+}
+
+function ListeningTask({ day }: { day: PlanDay }) {
+  const data = PRACTICE[day.day];
+  const [i, setI] = useState(0);
+  const [typed, setTyped] = useState("");
+  const [diff, setDiff] = useState<{ word: string; ok: boolean }[] | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  if (!data) return <Text style={styles.rule}>या दिवसाचा listening सराव लवकरच येईल.</Text>;
+
+  const sentence = data.dictation[i % data.dictation.length];
+  const check = () => {
+    setDiff(dictationDiff(sentence, typed));
+    bump("sentences");
+  };
+  const pct = diff ? Math.round((diff.filter((d) => d.ok).length / diff.length) * 100) : 0;
+
+  return (
+    <View>
+      <Text style={styles.grammarTitle}>भाग १: ऐका आणि लिहा</Text>
+      <Text style={styles.hintSmall}>वाक्य {(i % data.dictation.length) + 1}/{data.dictation.length}</Text>
+      <Text style={styles.rule}>वाक्य ऐका आणि जसं ऐकलं तसं इंग्रजीत लिहा. वाटल्यास हळू ऐका.</Text>
+      <View style={styles.btnRow}>
+        <PlayButton text={sentence} label="ऐका" />
+        <TouchableOpacity style={styles.playBtn} onPress={() => speakSlow(sentence)}>
+          <Ionicons name="walk-outline" size={20} color="#145E4C" />
+          <Text style={styles.playText}>हळू ऐका</Text>
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        style={styles.sentInputFull}
+        placeholder="Type what you hear..."
+        placeholderTextColor="#9CA3AF"
+        value={typed}
+        onChangeText={setTyped}
+        autoCapitalize="none"
+      />
+      <TouchableOpacity style={[styles.checkBtn, typed.trim().length < 2 && { opacity: 0.5 }]} onPress={check} disabled={typed.trim().length < 2}>
+        <Text style={styles.checkBtnText}>तपासा</Text>
+      </TouchableOpacity>
+      {diff && (
+        <View style={[styles.feedback, pct < 100 && { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+          <Text style={styles.score}>{pct === 100 ? "✓ परफेक्ट!" : `${pct}% बरोबर`}</Text>
+          <Text style={styles.corrected}>
+            {diff.map((d, k) => (
+              <Text key={k} style={{ color: d.ok ? "#166534" : "#B91C1C", fontWeight: d.ok ? "500" : "800" }}>
+                {d.word}{" "}
+              </Text>
+            ))}
+          </Text>
+          <Text style={styles.example}>लाल शब्द तुम्ही चुकवले.</Text>
+          <TouchableOpacity
+            style={[styles.checkBtn, { marginTop: 10 }]}
+            onPress={() => {
+              setI(i + 1);
+              setTyped("");
+              setDiff(null);
+            }}
+          >
+            <Text style={styles.checkBtnText}>पुढचं वाक्य</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.divider} />
+      <Text style={styles.grammarTitle}>भाग २: गोष्ट ऐका</Text>
+      <Text style={styles.rule}>गोष्ट न बघता २ वेळा ऐका, मग प्रश्नांची उत्तरं द्या. नंतर गोष्ट पहा.</Text>
+      <PlayButton text={data.passage.text} label="गोष्ट ऐका" />
+      <PassageQuestions questions={data.passage.questions} onFinished={() => setRevealed(true)} />
+      {revealed && (
+        <View style={styles.peekBox}>
+          <Text style={styles.word}>{data.passage.text}</Text>
+          <Text style={styles.example}>{data.passage.mr}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ReadingTask({ day }: { day: PlanDay }) {
+  const data = PRACTICE[day.day];
+  const [showMr, setShowMr] = useState(false);
+  const [info, setInfo] = useState<WordInfo | null>(null);
+  const [loadingWord, setLoadingWord] = useState<string | null>(null);
+  if (!data) return <Text style={styles.rule}>या दिवसाचं वाचन लवकरच येईल.</Text>;
+
+  const lookup = async (raw: string) => {
+    const word = raw.replace(/[^A-Za-z']/g, "");
+    if (!word) return;
+    setLoadingWord(word);
+    try {
+      setInfo(await lookupWord(word));
+      bump("lookups");
+    } catch (e: any) {
+      Alert.alert("शब्द सापडला नाही", e.message || "Try again");
+    } finally {
+      setLoadingWord(null);
+    }
+  };
+
+  return (
+    <View>
+      <Text style={styles.grammarTitle}>{data.passage.title}</Text>
+      <Text style={styles.rule}>गोष्ट वाचा. माहीत नसलेल्या शब्दावर दाबा, मराठी अर्थ दिसेल.</Text>
+      <View style={styles.passageBox}>
+        <Text style={styles.passageText}>
+          {data.passage.text.split(" ").map((w, k) => (
+            <Text key={k} onPress={() => lookup(w)} style={loadingWord === w.replace(/[^A-Za-z']/g, "") ? { color: "#B45309" } : undefined}>
+              {w}{" "}
+            </Text>
+          ))}
+        </Text>
+      </View>
+      <View style={styles.btnRow}>
+        <PlayButton text={data.passage.text} label="ऐका" />
+        <TouchableOpacity style={styles.playBtn} onPress={() => setShowMr(!showMr)}>
+          <Ionicons name="language" size={20} color="#145E4C" />
+          <Text style={styles.playText}>{showMr ? "मराठी लपवा" : "मराठी अर्थ"}</Text>
+        </TouchableOpacity>
+      </View>
+      {showMr && <Text style={styles.tipText}>{data.passage.mr}</Text>}
+      {info && (
+        <View style={styles.dictBoxInline}>
+          <TouchableOpacity onPress={() => say(`${info.word}. ${info.example}`)}>
+            <Text style={styles.word}>{info.word} <Text style={styles.example}>({info.partOfSpeech})</Text> 🔊</Text>
+          </TouchableOpacity>
+          <Text style={styles.meaningBig}>{info.meaning}</Text>
+          {!!info.forms && <Text style={styles.example}>V1-V2-V3: {info.forms}</Text>}
+          <Text style={styles.example}>{info.example}</Text>
+        </View>
+      )}
+      <View style={styles.divider} />
+      <Text style={styles.grammarTitle}>प्रश्न</Text>
+      <PassageQuestions questions={data.passage.questions} />
     </View>
   );
 }
@@ -647,6 +861,8 @@ export default function PlanScreen() {
   const renderTask = (k: TaskKey) => {
     switch (k) {
       case "vocab": return <VocabTask day={day} />;
+      case "listening": return <ListeningTask key={day.day} day={day} />;
+      case "reading": return <ReadingTask key={day.day} day={day} />;
       case "quiz": return <QuizTask key={day.day} day={day} />;
       case "grammar": return <GrammarTask day={day} />;
       case "verbs": return <VerbsTask day={day} />;
@@ -770,6 +986,16 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   streakPill: { backgroundColor: "#FEF3C7", color: "#B45309", fontWeight: "800", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, overflow: "hidden" },
   pron: { color: "#B45309", marginTop: 2, fontWeight: "600" },
+  playBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: "#E6F4EF", marginTop: 6, marginRight: 8 },
+  playText: { color: "#145E4C", fontWeight: "700" },
+  btnRow: { flexDirection: "row", flexWrap: "wrap" },
+  sentInputFull: { backgroundColor: "#F3F4F6", borderRadius: 12, padding: 12, fontSize: 16, marginTop: 10 },
+  qBlock: { marginTop: 12 },
+  divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 16 },
+  peekBox: { marginTop: 12, backgroundColor: "#FEF3C7", padding: 12, borderRadius: 12 },
+  passageBox: { backgroundColor: "#F9FAFB", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB", padding: 14 },
+  passageText: { fontSize: 18, lineHeight: 30, color: "#111827" },
+  dictBoxInline: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB" },
   celebrate: { fontSize: 48, textAlign: "center" },
   dayDone: { backgroundColor: "#DCFCE7", borderRadius: 14, padding: 14, marginBottom: 12, alignItems: "center" },
   dayDoneText: { color: "#166534", fontWeight: "700", textAlign: "center", marginTop: 4 },

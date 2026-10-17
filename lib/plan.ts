@@ -495,3 +495,8 @@ export const PLAN: PlanDay[] = [
       "स्वतःची ओळख करून देणारा ८-१० वाक्यांचा परिच्छेद लिहा: तुम्ही कोण आहात, या आठवड्यात काय केलं, आणि पुढच्या आठवड्याचे प्लॅन्स.",
   },
 ];
+
+// The 9 daily tasks, in the order the student does them
+export const TASK_KEYS = ["vocab", "listening", "reading", "quiz", "grammar", "verbs", "sentences", "speaking", "writing"] as const;
+export type TaskKey = (typeof TASK_KEYS)[number];
+export const TASKS_PER_DAY = TASK_KEYS.length;

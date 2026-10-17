@@ -5,14 +5,19 @@ import GestureRoot from "../lib/GestureRoot";
 import { AuthProvider, useAuth } from "../lib/useAuth";
 import { setupDailyReminder } from "../lib/notifications";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
+  // Ask for notification permission once, after login, on phones only (never on web page load)
   useEffect(() => {
-    setupDailyReminder();
+    if (user && Platform.OS !== "web") setupDailyReminder();
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (loading) return;
 
     const inTabsGroup = segments[0] === "(tabs)";
