@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from "react-native";
 import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../lib/useAuth";
@@ -65,7 +65,8 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollWrap} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.content}>
         {/* Header Section */}
         <View style={styles.headerContainer}>
           <View style={styles.logoContainer}>
@@ -223,13 +224,15 @@ export default function LoginScreen() {
         )}
 
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
+  scrollWrap: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  content: { width: '100%', maxWidth: 440, alignItems: 'center' },
   headerContainer: { alignItems: 'center', marginBottom: 20 },
   logoContainer: { width: 80, height: 80, backgroundColor: '#fff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   logo: { width: 50, height: 50 },
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
   titleGreen: { color: '#145E4C' },
   subtitleMarathi: { fontSize: 18, fontWeight: 'bold', color: '#145E4C', marginBottom: 4 },
   subtitleEnglish: { fontSize: 14, color: '#4B5563', textAlign: 'center', paddingHorizontal: 20 },
-  cardsContainer: { width: '100%', marginBottom: 32 },
+  cardsContainer: { width: '100%', maxWidth: 440, marginBottom: 32 },
   infoCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   promptCard: { backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#E0F2FE' },
   promptHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
@@ -251,7 +254,7 @@ const styles = StyleSheet.create({
   promptTextContainer: { flex: 1 },
   promptMarathi: { fontSize: 13, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
   promptEnglish: { fontSize: 13, color: '#145E4C' },
-  loginSection: { width: '100%', gap: 12 },
+  loginSection: { width: '100%', maxWidth: 440, gap: 12 },
   primaryBtn: { backgroundColor: '#145E4C', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
   primaryBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   secondaryBtn: { backgroundColor: '#EEF2FF', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
@@ -261,7 +264,7 @@ const styles = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
   line: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
   orText: { marginHorizontal: 10, color: '#9CA3AF', fontSize: 12, fontWeight: 'bold' },
-  formContainer: { width: '100%', gap: 16, marginTop: 20 },
+  formContainer: { width: '100%', maxWidth: 440, gap: 16, marginTop: 20 },
   formTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
   formSubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 10 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, fontSize: 16, color: '#111827' },
