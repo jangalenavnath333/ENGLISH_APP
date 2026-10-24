@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Platform, Modal, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../lib/useAuth";
@@ -13,8 +13,8 @@ import { getDueWords } from "../../lib/revision";
 const PLAN_KEY = "bolu_plan_done_v1";
 
 export default function HomeScreen() {
-  const { profile, logout } = useAuth();
-  const name = profile?.name || "Learner";
+  const { profile, user, resolvedName, logout, updateName } = useAuth();
+  const name = resolvedName || profile?.name || user?.displayName || "Learner";
 
   const [streak, setStreak] = useState(0);
   const [todaySeconds, setTodaySeconds] = useState(0);
@@ -22,6 +22,37 @@ export default function HomeScreen() {
   const [dayIdx, setDayIdx] = useState(0);
   const [doneToday, setDoneToday] = useState(0);
   const [allDone, setAllDone] = useState(0);
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameText, setEditNameText] = useState("");
+  const [savingName, setSavingName] = useState(false);
+
+  const handleOpenEditName = () => {
+    setEditNameText(name !== "Learner" ? name : "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = editNameText.trim();
+    if (!trimmed) {
+      Alert.alert("थांबा!", "कृपया तुमचे नाव टाका.");
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateName(trimmed);
+      setIsEditingName(false);
+      if (Platform.OS === "web") {
+        window.alert("तुमचं नाव सेव्ह झालं आहे! (Name updated successfully)");
+      } else {
+        Alert.alert("अभिनंदन!", "तुमचं नाव सेव्ह झालं आहे!");
+      }
+    } catch {
+      Alert.alert("एरर", "नाव सेव्ह करताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.");
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -90,7 +121,18 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.greeting}>नमस्कार, {name.split(" ")[0]}! 👋</Text>
+        <View style={styles.greetingContainer}>
+          <TouchableOpacity
+            style={styles.greetingTouchable}
+            activeOpacity={0.7}
+            onPress={handleOpenEditName}
+          >
+            <Text style={styles.greeting}>नमस्कार, {name.split(" ")[0]}! 👋</Text>
+            <View style={styles.editBadge}>
+              <Ionicons name="pencil" size={13} color="#145E4C" />
+            </View>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subGreeting}>
           {streak > 0 ? `🔥 ${streak} दिवसांची स्ट्रीक! आज सुद्धा सुरू ठेवा.` : "आजपासून सुरुवात करूया. रोज किमान ५ मिनिटं अभ्यास करा."}
         </Text>
@@ -161,6 +203,48 @@ export default function HomeScreen() {
             <Text style={styles.listenText}>ऐका</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Name Edit Modal */}
+        <Modal
+          visible={isEditingName}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsEditingName(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="person-circle" size={28} color="#145E4C" />
+                <Text style={styles.modalTitle}>तुमचे नाव टाका / बदला</Text>
+              </View>
+              <Text style={styles.modalSubtitle}>तुमचे नाव ॲपमध्ये आणि प्रगती अहवालावर दिसेल.</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="तुमचे नाव (उदा. Rahul)"
+                value={editNameText}
+                onChangeText={setEditNameText}
+                autoFocus
+                placeholderTextColor="#9CA3AF"
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setIsEditingName(false)}
+                  disabled={savingName}
+                >
+                  <Text style={styles.modalCancelText}>रद्द करा</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSaveBtn, savingName && { opacity: 0.6 }]}
+                  onPress={handleSaveName}
+                  disabled={savingName}
+                >
+                  <Text style={styles.modalSaveText}>{savingName ? "सेव्ह होत आहे..." : "सेव्ह करा"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -178,7 +262,10 @@ const styles = StyleSheet.create({
   streakText: { fontSize: 14, fontWeight: "bold", color: "#D97706" },
   profileIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#145E4C", justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20, paddingBottom: 40 },
-  greeting: { fontSize: 22, fontWeight: "bold", color: "#111827", marginBottom: 4 },
+  greetingContainer: { marginBottom: 4 },
+  greetingTouchable: { flexDirection: "row", alignItems: "center", gap: 8 },
+  editBadge: { backgroundColor: "#E6F4EA", width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#A7F3D0" },
+  greeting: { fontSize: 22, fontWeight: "bold", color: "#111827" },
   subGreeting: { fontSize: 14, color: "#374151", fontWeight: "500", marginBottom: 16 },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   statBox: { flex: 1, padding: 12, borderRadius: 12, alignItems: "center" },
@@ -205,4 +292,15 @@ const styles = StyleSheet.create({
   wordMeaning: { color: "#4B5563", marginTop: 4 },
   listenBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
   listenText: { color: "#145E4C", fontWeight: "700" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContent: { backgroundColor: "#fff", width: "100%", maxWidth: 360, borderRadius: 20, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 5 },
+  modalHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  modalSubtitle: { fontSize: 13, color: "#4B5563", marginBottom: 16 },
+  modalInput: { borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, color: "#111827", backgroundColor: "#F9FAFB", marginBottom: 20 },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 12 },
+  modalCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, backgroundColor: "#F3F4F6" },
+  modalCancelText: { color: "#4B5563", fontWeight: "600", fontSize: 14 },
+  modalSaveBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, backgroundColor: "#145E4C" },
+  modalSaveText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 });

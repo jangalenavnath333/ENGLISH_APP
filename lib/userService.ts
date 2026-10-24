@@ -22,39 +22,57 @@ export interface UserProfile {
 
 // Create or update user profile in Firestore
 export async function createUserProfile(uid: string, data: Partial<UserProfile>) {
-  const userRef = doc(db, "users", uid);
-  const existing = await getDoc(userRef);
+  try {
+    const userRef = doc(db, "users", uid);
+    const existing = await getDoc(userRef);
 
-  if (!existing.exists()) {
-    await setDoc(userRef, {
-      uid,
-      name: data.name || "User",
-      email: data.email || "",
-      xp: 0,
-      streak: 0,
-      level: "Elementary Level 1",
-      currentLesson: 1,
-      completedLessons: [],
-      lastPracticeDate: null,
-      createdAt: serverTimestamp(),
-      ...data,
-    });
-  } else {
-    // Update name if it's explicitly provided and valid
-    if (data.name && data.name !== "Learner" && data.name !== "Guest User") {
-      await updateDoc(userRef, { name: data.name });
+    if (!existing.exists()) {
+      await setDoc(userRef, {
+        uid,
+        name: data.name || "Learner",
+        email: data.email || "",
+        xp: 0,
+        streak: 0,
+        level: "Elementary Level 1",
+        currentLesson: 1,
+        completedLessons: [],
+        lastPracticeDate: null,
+        createdAt: serverTimestamp(),
+        ...data,
+      });
+    } else {
+      // Update name if it's explicitly provided and valid
+      if (data.name && data.name !== "Learner" && data.name !== "Guest User") {
+        await updateDoc(userRef, { name: data.name });
+      }
     }
+  } catch (error) {
+    console.warn("createUserProfile error:", error);
   }
 }
 
 // Get user profile from Firestore
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const userRef = doc(db, "users", uid);
-  const snap = await getDoc(userRef);
-  if (snap.exists()) {
-    return snap.data() as UserProfile;
+  try {
+    const userRef = doc(db, "users", uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      return snap.data() as UserProfile;
+    }
+  } catch (error) {
+    console.warn("getUserProfile error:", error);
   }
   return null;
+}
+
+// Explicitly update user name in Firestore
+export async function updateUserName(uid: string, name: string) {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, { name: name.trim() });
+  } catch (error) {
+    console.warn("updateUserName error:", error);
+  }
 }
 
 // Update XP and streak after practice

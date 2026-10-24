@@ -1,11 +1,24 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useAuth } from "../../lib/useAuth";
+import { getUsage, computeStreak } from "../../lib/usage";
 
 export default function ProgressScreen() {
+  const { user, profile, resolvedName } = useAuth();
+  const name = resolvedName || profile?.name || user?.displayName || "Learner";
+  const [streak, setStreak] = useState(profile?.streak || 0);
   const [activeTab, setActiveTab] = useState<'Achievements' | 'Writing' | 'Speaking'>('Achievements');
+
+  useFocusEffect(
+    useCallback(() => {
+      getUsage().then((u) => {
+        setStreak(computeStreak(u));
+      });
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -24,7 +37,7 @@ export default function ProgressScreen() {
         <View style={styles.headerRight}>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={16} color="#D97706" />
-            <Text style={styles.streakText}>5</Text>
+            <Text style={styles.streakText}>{streak}</Text>
           </View>
           <View style={styles.profileIcon}>
             <Ionicons name="person" size={16} color="#fff" />
@@ -37,7 +50,7 @@ export default function ProgressScreen() {
         <View style={styles.titleSection}>
           <View>
             <Text style={styles.pageTitle}>My Progress (माझी प्रगती)</Text>
-            <Text style={styles.pageSubtitle}>Navnath Waghmare · TY B.Sc. Comp</Text>
+            <Text style={styles.pageSubtitle}>{name} · English Learner</Text>
           </View>
           <TouchableOpacity style={styles.filterBtn}>
             <Ionicons name="options-outline" size={20} color="#4B5563" />
