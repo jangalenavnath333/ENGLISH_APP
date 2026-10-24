@@ -23,7 +23,6 @@ import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
 } from "expo-audio";
-import { File } from "expo-file-system";
 import {
   sendTalkTurn,
   synthesizeSpeech,
@@ -37,7 +36,7 @@ import {
   TalkInput,
   TalkTurn,
 } from "../../lib/gemini";
-import { playWavBase64, stopPlayback, blobUriToWavBase64 } from "../../lib/audio";
+import { playWavBase64, stopPlayback, blobUriToWavBase64, fileUriToBase64 } from "../../lib/audio";
 import { bump } from "../../lib/usage";
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
@@ -181,16 +180,21 @@ export default function TalkScreen() {
     // Android/iOS sometimes lack mr-IN, but hi-IN reads Devanagari perfectly.
     if (hasMarathi || speechLang === 'mr-IN') speechLang = 'hi-IN';
 
-    await new Promise<void>((resolve) =>
+    await new Promise<void>((resolve) => {
+      const guard = setTimeout(resolve, 15000);
+      const done = () => {
+        clearTimeout(guard);
+        resolve();
+      };
       Speech.speak(text, {
         language: speechLang,
         rate: 0.85,
         volume: 1,
-        onDone: () => resolve(),
-        onStopped: () => resolve(),
-        onError: () => resolve(),
-      })
-    );
+        onDone: done,
+        onStopped: done,
+        onError: done,
+      });
+    });
     setStatus((s) => (s === "speaking" ? "idle" : s));
   };
 
@@ -266,7 +270,8 @@ export default function TalkScreen() {
       if (Platform.OS === "web") {
         await submit({ audioBase64: await blobUriToWavBase64(uri), audioMimeType: "audio/wav" });
       } else {
-        await submit({ audioBase64: await new File(uri).base64(), audioMimeType: "audio/mp4" });
+        const base64 = await fileUriToBase64(uri);
+        await submit({ audioBase64: base64, audioMimeType: "audio/mp4" });
       }
     } catch (e: any) {
       setStatus("idle");

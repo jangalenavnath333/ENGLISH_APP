@@ -20,7 +20,6 @@ import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
 } from "expo-audio";
-import { File } from "expo-file-system";
 import {
   sendCallTurn,
   synthesizeSpeech,
@@ -29,7 +28,7 @@ import {
   Tutor,
   TalkHistoryItem,
 } from "../../lib/gemini";
-import { playWavBase64, stopPlayback, blobToWavBase64, makeRingbackWavBase64 } from "../../lib/audio";
+import { playWavBase64, stopPlayback, blobToWavBase64, makeRingbackWavBase64, fileUriToBase64 } from "../../lib/audio";
 import { bump } from "../../lib/usage";
 
 type CallStatus = "idle" | "listening" | "thinking" | "speaking" | "muted";
@@ -41,15 +40,15 @@ interface LogLine {
 
 const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
 
-const POLL_MS = 120;
-const SILENCE_END_MS = 1300; // silence after speech => user finished
-const MAX_UTTERANCE_MS = 25000;
-const MIN_SPEECH_MS = 350; // ignore coughs / clicks shorter than this
+const POLL_MS = 100;
+const SILENCE_END_MS = 1100; // silence after speech => user finished
+const MAX_UTTERANCE_MS = 20000;
+const MIN_SPEECH_MS = 300; // ignore coughs / clicks shorter than this
 const MAX_ERRORS_IN_ROW = 3;
-const CALIBRATION_POLLS = 6; // ~0.7s at the start of each turn to learn the background noise
-const VOICE_ABOVE_FLOOR_DB = 10; // speech = this much louder than the noise floor
-const MIN_VOICE_DB = -52; // ...and never quieter than this
-const NO_VOICE_HINT_MS = 9000;
+const CALIBRATION_POLLS = 5; // ~0.5s at the start of each turn to learn the background noise
+const VOICE_ABOVE_FLOOR_DB = Platform.OS === "web" ? 10 : 6;
+const MIN_VOICE_DB = Platform.OS === "web" ? -52 : -65;
+const NO_VOICE_HINT_MS = 7500;
 
 const FALLBACK_GREETING = "Hello! I am your English teacher. How are you doing today?";
 
@@ -288,13 +287,14 @@ export default function CallScreen() {
       }
 
       await new Promise<void>((resolve) => {
-        const guard = setTimeout(resolve, 30000);
+        const guard = setTimeout(resolve, 20000);
         const done = () => {
           clearTimeout(guard);
           resolve();
         };
+        const lang = hasDevanagari ? "hi-IN" : (languageRef.current.speech === "mr-IN" ? "hi-IN" : languageRef.current.speech);
         Speech.speak(text, {
-          language: hasDevanagari ? "hi-IN" : languageRef.current.speech,
+          language: lang,
           rate: 0.9,
           onDone: done,
           onStopped: done,
@@ -340,12 +340,14 @@ export default function CallScreen() {
         const raw = isWeb ? readWebLevel() : recorder.getStatus().metering;
 
         if (typeof raw === "number") {
+          const clampedRaw = Math.max(-90, Math.min(0, raw));
           polls += 1;
-          smooth = polls === 1 ? raw : smooth * 0.4 + raw * 0.6;
+          smooth = polls === 1 ? clampedRaw : smooth * 0.4 + clampedRaw * 0.6;
           if (polls <= CALIBRATION_POLLS) {
-            // first ~0.7s: the quietest moment is the background noise
+            // first ~0.5s: the quietest moment is the background noise
             floor = polls === 1 ? smooth : Math.min(floor, smooth);
           } else {
+            floor = Math.max(-75, Math.min(-38, floor));
             if (smooth < floor) floor = smooth; // quieter: noise floor drops at once
             else floor += (smooth - floor) * 0.02; // louder: rises slowly, so speech does not raise it
             const isVoice = smooth > floor + VOICE_ABOVE_FLOOR_DB && smooth > MIN_VOICE_DB;
@@ -361,7 +363,7 @@ export default function CallScreen() {
 
         if (!speechStartedAt && !hintShown && now - startedAt > NO_VOICE_HINT_MS) {
           hintShown = true;
-          setNotice("आवाज ऐकू येत नाही. Mic जवळ बोला किंवा तुमचा Mic चालू आहे का ते तपासा.");
+          setNotice("आवाज ऐकू येत नाही. Mic जवळ बोला किंवा 'Send now' दाबा.");
         }
 
         const heardSpeech = speechMs >= MIN_SPEECH_MS;
@@ -384,7 +386,8 @@ export default function CallScreen() {
       if (runId !== runIdRef.current || mutedRef.current) return null;
       const fileUri = recorder.uri; // read AFTER stop: it only points to this recording once stopped
       if (!heard || !fileUri) return null;
-      return { base64: await new File(fileUri).base64(), mime: "audio/mp4" };
+      const base64 = await fileUriToBase64(fileUri);
+      return { base64, mime: "audio/mp4" };
     },
     [applyAudioMode, recorder, stopRecorderQuietly, startWebRecording, stopWebRecording, updateHearing]
   );

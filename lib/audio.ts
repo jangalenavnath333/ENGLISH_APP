@@ -2,6 +2,8 @@ import { Platform } from "react-native";
 import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { File, Paths } from "expo-file-system";
 
+import * as LegacyFileSystem from "expo-file-system/legacy";
+
 let stopCurrent: (() => void) | null = null;
 
 // iOS Safari only allows audio.play() after a user gesture. Our voice arrives after a network call,
@@ -31,6 +33,86 @@ export function stopPlayback() {
   stopCurrent = null;
 }
 
+// Converts any audio URI (native file:// or web blob:) into base64 string reliably across platforms
+export async function fileUriToBase64(uri: string): Promise<string> {
+  if (Platform.OS === "web") {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const b64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(b64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Native: Android / iOS
+  // 1. Try legacy FileSystem.readAsStringAsync (most reliable on Android/iOS native file:// URIs)
+  try {
+    const b64 = await LegacyFileSystem.readAsStringAsync(uri, {
+      encoding: LegacyFileSystem.EncodingType.Base64,
+    });
+    if (b64) return b64;
+  } catch (err1) {
+    console.log("LegacyFileSystem.readAsStringAsync error:", err1);
+  }
+
+  // 2. Try expo-file-system next File(uri).base64()
+  try {
+    const f = new File(uri);
+    const b64 = await f.base64();
+    if (b64) return b64;
+  } catch (err2) {
+    console.log("File.base64 error:", err2);
+  }
+
+  // 3. Fallback: fetch blob
+  try {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const b64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(b64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (err3) {
+    throw new Error(`Audio file read failed: ${err3}`);
+  }
+}
+
+// Writes base64 wav to cache file on device
+export async function writeWavCacheFile(base64: string): Promise<string> {
+  const filename = "bolu-tts.wav";
+  try {
+    const targetUri = `${LegacyFileSystem.cacheDirectory}${filename}`;
+    await LegacyFileSystem.writeAsStringAsync(targetUri, base64, {
+      encoding: LegacyFileSystem.EncodingType.Base64,
+    });
+    return targetUri;
+  } catch (err1) {
+    console.log("LegacyFileSystem write error:", err1);
+  }
+
+  try {
+    const file = new File(Paths.cache, filename);
+    if (!file.exists) file.create();
+    file.write(base64, { encoding: "base64" });
+    return file.uri;
+  } catch (err2) {
+    console.log("File.write error:", err2);
+    throw err2;
+  }
+}
+
 // Plays a base64 WAV at full volume. Resolves when playback finishes.
 export async function playWavBase64(base64: string, isSpeaker: boolean = true): Promise<void> {
   stopPlayback();
@@ -56,24 +138,53 @@ export async function playWavBase64(base64: string, isSpeaker: boolean = true): 
     allowsRecording: !isSpeaker,
     shouldRouteThroughEarpiece: !isSpeaker,
   });
-  const file = new File(Paths.cache, "bolu-tts.wav");
-  if (!file.exists) file.create();
-  file.write(base64, { encoding: "base64" });
+
+  const fileUri = await writeWavCacheFile(base64);
 
   return new Promise<void>((resolve) => {
-    const player = createAudioPlayer({ uri: file.uri });
-    player.volume = 1;
-    const sub = player.addListener("playbackStatusUpdate", (status: any) => {
-      if (status.didJustFinish) done();
-    });
-    const done = () => {
-      sub.remove();
-      player.release();
+    let resolved = false;
+    let guardTimer: any = null;
+    let sub: any = null;
+    let player: any = null;
+
+    const cleanup = () => {
+      if (resolved) return;
+      resolved = true;
+      if (guardTimer) clearTimeout(guardTimer);
+      try {
+        sub?.remove?.();
+      } catch {}
+      try {
+        player?.pause?.();
+      } catch {}
+      try {
+        if (typeof player?.release === "function") {
+          player.release();
+        }
+      } catch {}
       stopCurrent = null;
       resolve();
     };
-    stopCurrent = done;
-    player.play();
+
+    stopCurrent = cleanup;
+
+    try {
+      player = createAudioPlayer({ uri: fileUri });
+      player.volume = 1;
+      sub = player.addListener("playbackStatusUpdate", (status: any) => {
+        if (status.didJustFinish) cleanup();
+      });
+      player.play();
+
+      // Guard timer: if audio finishes or status listener fails to fire on native,
+      // resolve after 15 seconds so the call loop never freezes
+      guardTimer = setTimeout(() => {
+        cleanup();
+      }, 15000);
+    } catch (e) {
+      console.log("AudioPlayer play error:", e);
+      cleanup();
+    }
   });
 }
 
